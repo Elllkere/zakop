@@ -26,6 +26,8 @@ type Proxy struct {
 	Rules               []config.Rule
 	FilterAAAAForFakeIP bool
 	Timeout             time.Duration
+	fakeForwardSlots    chan struct{}
+	realForwardSlots    chan struct{}
 }
 
 type Query struct {
@@ -39,6 +41,10 @@ const (
 	qTypeAAAA              uint16 = 28
 	rrTypeOPT              uint16 = 41
 	ednsClientSubnetOption uint16 = 8
+	// Keep the combined ceiling below dnsmasq's default dns-forward-max of
+	// 150. Separate pools prevent a failed real-DNS path from starving FakeIP.
+	maxFakeDNSForwards = 32
+	maxRealDNSForwards = 96
 )
 
 func New(cfg config.Config) Proxy {
@@ -66,6 +72,8 @@ func New(cfg config.Config) Proxy {
 		Rules:               append([]config.Rule(nil), cfg.EffectiveRules()...),
 		FilterAAAAForFakeIP: cfg.Main.FilterAAAAForFakeIP,
 		Timeout:             5 * time.Second,
+		fakeForwardSlots:    make(chan struct{}, maxFakeDNSForwards),
+		realForwardSlots:    make(chan struct{}, maxRealDNSForwards),
 	}
 }
 
@@ -174,14 +182,52 @@ func (p Proxy) handleUDP(ctx context.Context, msg []byte, clientIP string) ([]by
 	if resp, ok := p.localResponse(msg, clientIP); ok {
 		return resp, nil
 	}
-	return p.forwardUDP(ctx, stripClientSubnetOption(msg), p.upstreamFor(msg, clientIP))
+	upstream := p.upstreamFor(msg, clientIP)
+	release, ok := p.reserveForward(upstream)
+	if !ok {
+		return servfailResponse(msg), nil
+	}
+	defer release()
+
+	resp, err := p.forwardUDP(ctx, stripClientSubnetOption(msg), upstream)
+	if err != nil {
+		return servfailResponse(msg), nil
+	}
+	return resp, nil
 }
 
 func (p Proxy) handleTCPQuery(ctx context.Context, msg []byte, clientIP string) ([]byte, error) {
 	if resp, ok := p.localResponse(msg, clientIP); ok {
 		return resp, nil
 	}
-	return p.forwardTCP(ctx, stripClientSubnetOption(msg), p.upstreamFor(msg, clientIP))
+	upstream := p.upstreamFor(msg, clientIP)
+	release, ok := p.reserveForward(upstream)
+	if !ok {
+		return servfailResponse(msg), nil
+	}
+	defer release()
+
+	resp, err := p.forwardTCP(ctx, stripClientSubnetOption(msg), upstream)
+	if err != nil {
+		return servfailResponse(msg), nil
+	}
+	return resp, nil
+}
+
+func (p Proxy) reserveForward(upstream string) (func(), bool) {
+	slots := p.realForwardSlots
+	if upstream == p.FakeUpstream {
+		slots = p.fakeForwardSlots
+	}
+	if slots == nil {
+		return func() {}, true
+	}
+	select {
+	case slots <- struct{}{}:
+		return func() { <-slots }, true
+	default:
+		return nil, false
+	}
 }
 
 func (p Proxy) forwardUDP(ctx context.Context, msg []byte, upstream string) ([]byte, error) {
@@ -597,6 +643,16 @@ func nodataResponse(query []byte, questionEnd int) []byte {
 func nxdomainResponse(query []byte, questionEnd int) []byte {
 	resp := nodataResponse(query, questionEnd)
 	resp[3] = (resp[3] & 0xf0) | 0x03
+	return resp
+}
+
+func servfailResponse(query []byte) []byte {
+	parsed, ok := ParseQuery(query)
+	if !ok {
+		return nil
+	}
+	resp := nodataResponse(query, parsed.QuestionEnd)
+	resp[3] = (resp[3] & 0xf0) | 0x02
 	return resp
 }
 

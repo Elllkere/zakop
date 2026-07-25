@@ -26,10 +26,13 @@ func TestGenerateUsesModernFakeIPServer(t *testing.T) {
 	if strings.Contains(raw, `"fake-ip"`) || strings.Contains(raw, `"fake_ip"`) {
 		t.Fatalf("legacy fake-ip config detected:\n%s", raw)
 	}
-	for _, want := range []string{`"listen_port": 15353`, `"listen_port": 15354`, `"listen_port": 15355`, `"listen_port": 16001`, `"tag": "tproxy-0000-in"`} {
+	for _, want := range []string{`"listen_port": 15353`, `"listen_port": 15354`, `"listen_port": 15355`, `"listen_port": 16001`, `"tag": "tproxy-0000-in"`, `"udp_timeout": "10s"`} {
 		if !strings.Contains(raw, want) {
 			t.Fatalf("expected DNS and TProxy listeners %q:\n%s", want, raw)
 		}
+	}
+	if count := strings.Count(raw, `"udp_timeout": "10s"`); count != 3 {
+		t.Fatalf("expected a short UDP timeout on all three DNS inbounds, got %d:\n%s", count, raw)
 	}
 	if !strings.Contains(raw, `"default_domain_resolver": "real-direct"`) {
 		t.Fatalf("expected route.default_domain_resolver:\n%s", raw)

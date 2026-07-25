@@ -351,7 +351,8 @@ func TestEmbeddedSingBoxLogWrapperIsInstalledAsset(t *testing.T) {
 		"#!/bin/sh",
 		"/tmp/neto/sing-box.log",
 		"tail -c \"$log_keep_bytes\"",
-		"exec \"$bin\" run -c \"$config\" >> \"$log_file\" 2>&1",
+		"\"$bin\" run -c \"$config\" >> \"$log_file\" 2>&1 &",
+		`"$netod_bin" ready`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("%s missing %q:\n%s", path, want, s)

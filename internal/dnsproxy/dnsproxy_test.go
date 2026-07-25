@@ -1,10 +1,13 @@
 package dnsproxy
 
 import (
+	"context"
 	"encoding/binary"
+	"net"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elllkere/neto/internal/config"
 )
@@ -268,6 +271,51 @@ func TestDNSPolicyBlockReturnsNXDOMAIN(t *testing.T) {
 	}
 	if rcode := resp[3] & 0x0f; rcode != 3 {
 		t.Fatalf("rcode=%d, want NXDOMAIN", rcode)
+	}
+}
+
+func TestForwardFailureReturnsSERVFAIL(t *testing.T) {
+	upstream, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upstream.Close()
+
+	p := Proxy{
+		FakeUpstream:       "127.0.0.1:15353",
+		RealDirectUpstream: upstream.LocalAddr().String(),
+		Timeout:            20 * time.Millisecond,
+	}
+	resp, err := p.handleUDP(context.Background(), testQueryName(qTypeA, "example.org"), "192.168.8.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp) == 0 || resp[2]&0x80 == 0 {
+		t.Fatalf("expected DNS error response, got %x", resp)
+	}
+	if rcode := resp[3] & 0x0f; rcode != 2 {
+		t.Fatalf("rcode=%d, want SERVFAIL", rcode)
+	}
+}
+
+func TestForwardLimitReturnsImmediateSERVFAIL(t *testing.T) {
+	p := Proxy{
+		FakeUpstream:       "127.0.0.1:15353",
+		RealDirectUpstream: "127.0.0.1:15354",
+		realForwardSlots:   make(chan struct{}, 1),
+	}
+	p.realForwardSlots <- struct{}{}
+
+	start := time.Now()
+	resp, err := p.handleUDP(context.Background(), testQueryName(qTypeA, "example.org"), "192.168.8.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed > 100*time.Millisecond {
+		t.Fatalf("overloaded forward waited %v instead of failing immediately", elapsed)
+	}
+	if len(resp) == 0 || resp[3]&0x0f != 2 {
+		t.Fatalf("expected SERVFAIL response, got %x", resp)
 	}
 }
 

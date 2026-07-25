@@ -2,8 +2,12 @@ package openwrt
 
 import (
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestInitScriptStartsTwoProcdInstances(t *testing.T) {
@@ -50,6 +54,114 @@ func TestInitScriptStartsTwoProcdInstances(t *testing.T) {
 	block := s[start : start+end]
 	if strings.Contains(block, "procd_set_param stdout 1") || strings.Contains(block, "procd_set_param stderr 1") {
 		t.Fatalf("sing-box stdout/stderr must not be forwarded to system log:\n%s", block)
+	}
+}
+
+func TestSingBoxWrapperRestartsAfterSustainedDNSFailure(t *testing.T) {
+	data, err := os.ReadFile("../../embedded/files/usr/share/neto/run-sing-box-log.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+	for _, want := range []string{
+		`health_failures_max="${NETO_DNS_HEALTH_FAILURES:-3}"`,
+		`"$netod_bin" ready -timeout "${health_timeout}s"`,
+		`real DNS health check failed $health_failures times; restarting sing-box`,
+		`kill "$child_pid"`,
+		`trap stop_child INT TERM`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("sing-box DNS watchdog is missing %q:\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, `exec "$bin" run`) {
+		t.Fatalf("wrapper cannot supervise an exec-replaced sing-box process:\n%s", s)
+	}
+}
+
+func TestSingBoxWrapperDNSWatchdogRestartsChild(t *testing.T) {
+	tempDir := t.TempDir()
+	startsPath := filepath.Join(tempDir, "starts")
+	stopsPath := filepath.Join(tempDir, "stops")
+	logPath := filepath.Join(tempDir, "sing-box.log")
+	singBoxPath := filepath.Join(tempDir, "sing-box")
+	netodPath := filepath.Join(tempDir, "netod")
+
+	singBoxScript := `#!/bin/sh
+printf 'start\n' >> "$NETO_TEST_STARTS"
+trap 'printf "stop\n" >> "$NETO_TEST_STOPS"; exit 0' TERM INT
+while :; do
+	sleep 1
+done
+`
+	if err := os.WriteFile(singBoxPath, []byte(singBoxScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(netodPath, []byte("#!/bin/sh\nexit 1\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	wrapper := "../../embedded/files/usr/share/neto/run-sing-box-log.sh"
+	cmd := exec.Command("sh", wrapper, singBoxPath, filepath.Join(tempDir, "config.json"))
+	cmd.Env = append(os.Environ(),
+		"NETO_NETOD="+netodPath,
+		"NETO_SINGBOX_LOG="+logPath,
+		"NETO_DNS_HEALTH_GRACE_SECONDS=1",
+		"NETO_DNS_HEALTH_INTERVAL_SECONDS=1",
+		"NETO_DNS_HEALTH_FAILURES=2",
+		"NETO_DNS_HEALTH_TIMEOUT_SECONDS=1",
+		"NETO_TEST_STARTS="+startsPath,
+		"NETO_TEST_STOPS="+stopsPath,
+	)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+	}()
+
+	deadline := time.Now().Add(8 * time.Second)
+	for {
+		data, _ := os.ReadFile(startsPath)
+		if strings.Count(string(data), "start\n") >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			logData, _ := os.ReadFile(logPath)
+			t.Fatalf("watchdog did not restart sing-box; starts=%q log=%q", data, logData)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("wrapper did not stop cleanly: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("wrapper did not terminate its sing-box child")
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(logData), "real DNS health check failed 2 times; restarting sing-box") {
+		t.Fatalf("watchdog restart was not logged: %s", logData)
+	}
+	stopData, err := os.ReadFile(stopsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(stopData), "stop\n") < 2 {
+		t.Fatalf("watchdog or wrapper left a sing-box child running: %q", stopData)
 	}
 }
 

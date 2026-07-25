@@ -87,24 +87,29 @@ func Generate(cfg config.Config) ([]byte, error) {
 		})
 	}
 
+	// netod uses a new source port per forwarded DNS query. Keep the DNS-only
+	// sing-box UDP NAT entries much shorter than the listen option's 5m default.
 	inbounds := []any{
 		map[string]any{
 			"type":        "direct",
 			"tag":         "dns-fakeip-in",
 			"listen":      fakeDNSHost,
 			"listen_port": fakeDNSPort,
+			"udp_timeout": "10s",
 		},
 		map[string]any{
 			"type":        "direct",
 			"tag":         "dns-real-direct-in",
 			"listen":      realDirectDNSHost,
 			"listen_port": realDirectDNSPort,
+			"udp_timeout": "10s",
 		},
 		map[string]any{
 			"type":        "direct",
 			"tag":         "dns-real-proxy-in",
 			"listen":      realProxyDNSHost,
 			"listen_port": realProxyDNSPort,
+			"udp_timeout": "10s",
 		},
 	}
 	for _, target := range proxyTargets {
