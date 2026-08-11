@@ -21,6 +21,8 @@ var ru = {
 	'Disable': 'Выключить',
 	'Running': 'Запущен',
 	'Stopped': 'Остановлен',
+	'Service did not start in time': 'Сервис не запустился за отведённое время',
+	'Service did not stop in time': 'Сервис не остановился за отведённое время',
 	'Enabled': 'Включен',
 	'Disabled': 'Выключен',
 	'Unknown': 'Неизвестно',

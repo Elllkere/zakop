@@ -70,6 +70,23 @@ function serviceStatus(res) {
 	return res && res.code == 0 ? _('Running') : _('Stopped');
 }
 
+function waitForServiceState(running, attempts) {
+	return fs.exec('/etc/init.d/neto', [ 'status' ])
+		.then(function(res) {
+			if (!!res && (res.code == 0) == running)
+				return res;
+
+			if (attempts <= 1)
+				throw new Error(running ? _('Service did not start in time') : _('Service did not stop in time'));
+
+			return new Promise(function(resolve) {
+				window.setTimeout(resolve, 250);
+			}).then(function() {
+				return waitForServiceState(running, attempts - 1);
+			});
+		});
+}
+
 function autostartStatus(res) {
 	return res && res.code == 0 ? _('Enabled') : _('Disabled');
 }
@@ -543,6 +560,9 @@ return view.extend({
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Update failed'));
 
+				return waitForServiceState(action == 'start', 40);
+			})
+			.then(function() {
 				window.location.reload();
 			});
 	},
