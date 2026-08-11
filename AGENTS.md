@@ -275,6 +275,14 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
   per-outbound nft TProxy targets; FakeIP domain rules use sing-box reverse
   mapping followed by ordered domain route rules. Do not collapse rule
   outbounds into one shared sing-box `route.final`.
+- `config outbound_pool` provides strict-priority failover across two or more
+  unique concrete custom outbounds. Pool tags share the selectable namespace
+  with outbound tags, nested pools are not supported, and list order is
+  priority order. Pools are generated as sing-box selectors; netod uses the
+  localhost-only Clash API to choose the first healthy member and return to a
+  recovered higher-priority member. Pools are selectable everywhere a custom
+  outbound is selected, including temporary update paths, which retry concrete
+  pool members sequentially.
 - Startup must not enable nft/TProxy policy or point dnsmasq at netod until an
   end-to-end query through netod and the selected sing-box real-DNS listener
   succeeds.

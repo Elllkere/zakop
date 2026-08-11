@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,6 +40,7 @@ type Config struct {
 	Rules         []Rule
 	Providers     []Provider
 	Outbounds     []Outbound
+	OutboundPools []OutboundPool
 	Subscriptions []Subscription
 	Warnings      []string
 }
@@ -67,6 +69,7 @@ type Main struct {
 	SingBoxDNSFakeIP      string
 	SingBoxDNSRealDirect  string
 	SingBoxDNSRealProxy   string
+	PoolController        string
 	TProxyPort            int
 	Mark                  string
 	Table                 int
@@ -283,6 +286,14 @@ type Outbound struct {
 	HysteriaDownMbps     int
 }
 
+type OutboundPool struct {
+	Tag           string
+	Label         string
+	Outbounds     []string
+	CheckURL      string
+	CheckInterval int
+}
+
 type Subscription struct {
 	Name                  string
 	Label                 string
@@ -344,6 +355,7 @@ func Defaults() Config {
 			SingBoxDNSFakeIP:      "127.0.0.1:15353",
 			SingBoxDNSRealDirect:  "127.0.0.1:15354",
 			SingBoxDNSRealProxy:   "127.0.0.1:15355",
+			PoolController:        "127.0.0.1:19090",
 			TProxyPort:            16001,
 			Mark:                  "0x101",
 			Table:                 101,
@@ -387,7 +399,49 @@ func (c Config) AllowedOutboundTags() map[string]struct{} {
 			tags[outbound.Tag] = struct{}{}
 		}
 	}
+	for _, pool := range c.OutboundPools {
+		if strings.TrimSpace(pool.Tag) != "" {
+			tags[pool.Tag] = struct{}{}
+		}
+	}
 	return tags
+}
+
+func (c Config) ProxyTargetTags() []string {
+	tags := make([]string, 0, len(c.Outbounds)+len(c.OutboundPools))
+	for _, outbound := range c.EnabledCustomOutbounds() {
+		tags = append(tags, outbound.Tag)
+	}
+	for _, pool := range c.OutboundPools {
+		if tag := strings.TrimSpace(pool.Tag); tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
+}
+
+func (c Config) OutboundPoolByTag(tag string) (OutboundPool, bool) {
+	tag = strings.TrimSpace(tag)
+	for _, pool := range c.OutboundPools {
+		if pool.Tag == tag {
+			return pool, true
+		}
+	}
+	return OutboundPool{}, false
+}
+
+func (c Config) OutboundCandidateTags(tag string) []string {
+	tag = strings.TrimSpace(tag)
+	if pool, ok := c.OutboundPoolByTag(tag); ok {
+		return append([]string(nil), pool.Outbounds...)
+	}
+	if tag != "" {
+		return []string{tag}
+	}
+	for _, outbound := range c.EnabledCustomOutbounds() {
+		return []string{outbound.Tag}
+	}
+	return nil
 }
 
 func (c Config) EffectiveRules() []Rule {
@@ -588,6 +642,8 @@ func Parse(data string) (Config, error) {
 			outbound, warnings := parseOutbound(s)
 			cfg.Outbounds = append(cfg.Outbounds, outbound)
 			cfg.Warnings = append(cfg.Warnings, warnings...)
+		case "outbound_pool":
+			cfg.OutboundPools = append(cfg.OutboundPools, parseOutboundPool(s))
 		case "subscription":
 			cfg.Subscriptions = append(cfg.Subscriptions, parseSubscription(s))
 		}
@@ -714,6 +770,17 @@ func (c Config) Validate() error {
 		}
 		seenDNSListeners[addr] = name
 	}
+	if len(c.OutboundPools) > 0 {
+		if _, _, err := net.SplitHostPort(c.Main.PoolController); err != nil {
+			return fmt.Errorf("invalid pool_controller %q: %w", c.Main.PoolController, err)
+		}
+		if host, _, _ := net.SplitHostPort(c.Main.PoolController); host != "127.0.0.1" && host != "::1" {
+			return fmt.Errorf("pool_controller must listen on loopback")
+		}
+		if previous := seenDNSListeners[c.Main.PoolController]; previous != "" {
+			return fmt.Errorf("pool_controller must not duplicate %s", previous)
+		}
+	}
 	if c.Main.RealDNSUpstream != "" {
 		if _, _, err := net.SplitHostPort(c.Main.RealDNSUpstream); err != nil {
 			return fmt.Errorf("invalid real_dns_upstream %q: %w", c.Main.RealDNSUpstream, err)
@@ -762,6 +829,7 @@ func (c Config) Validate() error {
 		BuiltinDirectOutbound:  {},
 		BuiltinBlockedOutbound: {},
 	}
+	customOutboundTags := map[string]struct{}{}
 	for _, outbound := range c.Outbounds {
 		if !outbound.Enabled {
 			continue
@@ -777,6 +845,7 @@ func (c Config) Validate() error {
 			return fmt.Errorf("duplicate enabled outbound tag %q", tag)
 		}
 		seenOutboundTags[tag] = struct{}{}
+		customOutboundTags[tag] = struct{}{}
 		switch outbound.Type {
 		case "vless":
 			if err := requireOutboundFields(outbound, "server", "port", "uuid"); err != nil {
@@ -801,8 +870,52 @@ func (c Config) Validate() error {
 			return fmt.Errorf("outbound %q has unsupported type %q", outbound.Tag, outbound.Type)
 		}
 	}
-	if len(c.EnabledCustomOutbounds()) > 0 && c.Main.TProxyPort+len(c.EnabledCustomOutbounds())-1 > 65535 {
-		return fmt.Errorf("tproxy_port %d leaves insufficient ports for %d custom outbounds", c.Main.TProxyPort, len(c.EnabledCustomOutbounds()))
+	for _, pool := range c.OutboundPools {
+		tag := strings.TrimSpace(pool.Tag)
+		if tag == "" {
+			return fmt.Errorf("outbound pool tag must not be empty")
+		}
+		if reservedCustomOutboundTag(tag) {
+			return fmt.Errorf("outbound pool tag %q is reserved", tag)
+		}
+		if _, ok := seenOutboundTags[tag]; ok {
+			return fmt.Errorf("duplicate outbound or pool tag %q", tag)
+		}
+		if len(pool.Outbounds) < 2 {
+			return fmt.Errorf("outbound pool %q requires at least two outbounds", tag)
+		}
+		seenMembers := map[string]struct{}{}
+		for _, member := range pool.Outbounds {
+			if _, ok := customOutboundTags[member]; !ok {
+				return fmt.Errorf("outbound pool %q references unknown outbound %q", tag, member)
+			}
+			if _, ok := seenMembers[member]; ok {
+				return fmt.Errorf("outbound pool %q contains duplicate outbound %q", tag, member)
+			}
+			seenMembers[member] = struct{}{}
+		}
+		if pool.CheckURL == "" {
+			return fmt.Errorf("outbound pool %q check_url must not be empty", tag)
+		}
+		checkURL, err := url.Parse(pool.CheckURL)
+		if err != nil || checkURL.Host == "" || (checkURL.Scheme != "http" && checkURL.Scheme != "https") {
+			return fmt.Errorf("outbound pool %q has invalid check_url %q", tag, pool.CheckURL)
+		}
+		if pool.CheckInterval < 5 || pool.CheckInterval > 86400 {
+			return fmt.Errorf("outbound pool %q check_interval must be between 5 and 86400 seconds", tag)
+		}
+		seenOutboundTags[tag] = struct{}{}
+	}
+	proxyTargetCount := len(c.ProxyTargetTags())
+	if proxyTargetCount > 0 && c.Main.TProxyPort+proxyTargetCount-1 > 65535 {
+		return fmt.Errorf("tproxy_port %d leaves insufficient ports for %d outbound targets", c.Main.TProxyPort, proxyTargetCount)
+	}
+	if len(c.OutboundPools) > 0 {
+		controllerHost, controllerPortText, _ := net.SplitHostPort(c.Main.PoolController)
+		controllerPort, _ := strconv.Atoi(controllerPortText)
+		if controllerHost == "127.0.0.1" && controllerPort >= c.Main.TProxyPort && controllerPort < c.Main.TProxyPort+proxyTargetCount {
+			return fmt.Errorf("pool_controller must not use a generated TProxy port")
+		}
 	}
 	if c.Main.RoutingMode == "global" && len(c.EnabledCustomOutbounds()) == 0 {
 		return fmt.Errorf("routing_mode global requires a custom outbound")
@@ -1238,6 +1351,9 @@ func applyMain(m *Main, s section) {
 	if v := s.options["singbox_dns_real_proxy"]; v != "" {
 		m.SingBoxDNSRealProxy = v
 	}
+	if v := s.options["pool_controller"]; v != "" {
+		m.PoolController = strings.TrimSpace(v)
+	}
 	if v := s.options["tproxy_port"]; v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			m.TProxyPort = n
@@ -1658,6 +1774,22 @@ func parseOutbound(s section) (Outbound, []string) {
 	return outbound, warnings
 }
 
+func parseOutboundPool(s section) OutboundPool {
+	pool := OutboundPool{
+		Tag:           strings.TrimSpace(firstNonEmpty(s.options["tag"], s.name)),
+		Label:         strings.TrimSpace(firstNonEmpty(s.options["label"], s.options["name"], s.options["tag"], s.name)),
+		Outbounds:     trimList(appendList(s.lists["outbound"], splitListOption(s.options["outbound"]))),
+		CheckURL:      strings.TrimSpace(firstNonEmpty(s.options["check_url"], "https://www.gstatic.com/generate_204")),
+		CheckInterval: 60,
+	}
+	if v := strings.TrimSpace(s.options["check_interval"]); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			pool.CheckInterval = n
+		}
+	}
+	return pool
+}
+
 func parseSubscription(s section) Subscription {
 	updateSchedule := parseUpdateSchedule(s)
 	sub := Subscription{
@@ -1751,6 +1883,16 @@ func cleanList(values []string) []string {
 		}
 		seen[value] = struct{}{}
 		out = append(out, value)
+	}
+	return out
+}
+
+func trimList(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			out = append(out, value)
+		}
 	}
 	return out
 }

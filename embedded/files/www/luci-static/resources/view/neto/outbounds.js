@@ -54,6 +54,13 @@ function addProxyOutboundChoices(option) {
 			first = tag;
 		option.value(tag, label || tag);
 	});
+	uci.sections('neto', 'outbound_pool', function(section, sid) {
+		var tag = String(section.tag || sid || section['.name'] || '').trim();
+		var label = String(section.label || section.name || tag).trim();
+
+		if (tag != '' && !isReservedTag(tag))
+			option.value(tag, _('Pool: %s').format(label || tag));
+	});
 
 	option.default = first;
 	option.rmempty = false;
@@ -80,8 +87,69 @@ function outboundTagExists(tag) {
 		if (existing == tag)
 			found = true;
 	});
+	uci.sections('neto', 'outbound_pool', function(section, sid) {
+		var existing = String(section.tag || sid || section['.name'] || '').trim();
+
+		if (existing == tag)
+			found = true;
+	});
 
 	return found;
+}
+
+function concreteOutboundTagExists(tag) {
+	var found = false;
+
+	tag = String(tag || '').trim();
+	uci.sections('neto', 'outbound', function(section, sid) {
+		var existing = String(section.tag || sid || section['.name'] || '').trim();
+
+		if (existing == tag && !isReservedTag(existing))
+			found = true;
+	});
+
+	return found;
+}
+
+function outboundDisplayLabels() {
+	var labels = {};
+
+	uci.sections('neto', 'outbound', function(section, sid) {
+		var tag = String(section.tag || sid || section['.name'] || '').trim();
+		var label = String(section.label || section.name || tag).trim();
+
+		if (tag != '')
+			labels[tag] = label || tag;
+	});
+
+	return labels;
+}
+
+function poolPriorityText(section_id) {
+	var members = L.toArray(uci.get('neto', section_id, 'outbound'));
+	var labels = outboundDisplayLabels();
+	var full = [];
+	var content = [];
+
+	if (!members.length)
+		return '-';
+
+	for (var i = 0; i < members.length; i++) {
+		var label = labels[members[i]] || members[i];
+
+		full.push(label);
+		if (i > 0)
+			content.push(E('span', { 'style': 'flex:0 0 auto' }, '→'));
+		content.push(E('span', {
+			'title': label,
+			'style': 'display:block;flex:0 1 auto;min-width:5ch;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+		}, label));
+	}
+
+	return E('span', {
+		'title': full.join(' → '),
+		'style': 'display:flex;width:100%;min-width:0;max-width:100%;align-items:center;gap:.35em;overflow:hidden'
+	}, content);
 }
 
 function outboundTag(section_id) {
@@ -192,7 +260,10 @@ return view.extend({
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Commit failed'));
 
-				return uci.load('neto');
+				uci.unload('neto');
+				return uci.load('neto').then(function() {
+					return ui.changes.init();
+				});
 			});
 	},
 
@@ -516,7 +587,7 @@ return view.extend({
 	},
 
 	render: function() {
-		var m, s, o, self, sub;
+		var m, s, o, self, pool, sub;
 
 		netoUI.syncRulesTab();
 
@@ -846,6 +917,74 @@ return view.extend({
 		o.depends('type', 'shadowsocks');
 		o.default = '2022-blake3-aes-128-gcm';
 		o.rmempty = true;
+		o.modalonly = true;
+
+		pool = m.section(form.GridSection, 'outbound_pool', _('Outbound pools'),
+			_('A pool checks members in the displayed order, uses the first reachable outbound, and automatically returns to a higher-priority member after it recovers.'));
+		pool.anonymous = false;
+		pool.addremove = true;
+		pool.nodescriptions = true;
+		pool.modaltitle = _('Outbound pool details');
+		pool.sectiontitle = function(section_id) {
+			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+		};
+		pool.renderSectionAdd = function() {
+			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+			addNamedSectionValidator(el, this, _('This tag is reserved'), true);
+			return el;
+		};
+
+		o = pool.option(form.Value, 'label', _('Name'));
+		o.cfgvalue = function(section_id) {
+			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+		};
+		o.write = function(section_id, formvalue) {
+			var label = String(formvalue || '').trim();
+			uci.set('neto', section_id, 'label', label || section_id);
+		};
+		o.validate = function(section_id, value) {
+			return String(value || section_id || '').trim() != '' ? true : _('Name is required');
+		};
+		o.rmempty = false;
+		o.modalonly = true;
+
+		o = pool.option(form.DynamicList, 'outbound', _('Priority order'),
+			_('The top outbound has the highest priority. The next one is used only when every outbound above it is unavailable.'));
+		uci.sections('neto', 'outbound', function(section, sid) {
+			var tag = String(section.tag || sid || section['.name'] || '').trim();
+			var label = String(section.label || section.name || tag).trim();
+
+			if (tag != '' && !isReservedTag(tag))
+				o.value(tag, label || tag);
+		});
+		o.textvalue = function(section_id) {
+			return poolPriorityText(section_id);
+		};
+		o.width = '55%';
+		o.validate = function(_section_id, value) {
+			var members = L.toArray(value).map(function(member) {
+				return String(member || '').trim();
+			}).filter(function(member) {
+				return member != '';
+			});
+			for (var i = 0; i < members.length; i++) {
+				if (!concreteOutboundTagExists(members[i]))
+					return _('Unknown outbound: %s').format(members[i]);
+			}
+			return true;
+		};
+		o.rmempty = false;
+
+		o = pool.option(form.Value, 'check_url', _('Health check URL'));
+		o.datatype = 'url';
+		o.default = 'https://www.gstatic.com/generate_204';
+		o.rmempty = false;
+		o.modalonly = true;
+
+		o = pool.option(form.Value, 'check_interval', _('Check interval (seconds)'));
+		o.datatype = 'range(5,86400)';
+		o.default = '60';
+		o.rmempty = false;
 		o.modalonly = true;
 
 		sub = m.section(form.GridSection, 'subscription', _('Subscriptions'));

@@ -139,6 +139,12 @@ function proxyOutboundExists(tag) {
 		if (existing == tag)
 			found = true;
 	});
+	uci.sections('neto', 'outbound_pool', function(section, sid) {
+		var existing = String(section.tag || sid || section['.name'] || '').trim();
+
+		if (existing == tag)
+			found = true;
+	});
 
 	return found;
 }
@@ -169,6 +175,13 @@ function addProxyOutboundChoices(option) {
 		if (first == '')
 			first = tag;
 		option.value(tag, label || tag);
+	});
+	uci.sections('neto', 'outbound_pool', function(section, sid) {
+		var tag = String(section.tag || sid || section['.name'] || '').trim();
+		var label = String(section.label || section.name || tag).trim();
+
+		if (tag != '' && !isReservedOutboundTag(tag))
+			option.value(tag, _('Pool: %s').format(label || tag));
 	});
 
 	option.default = first;

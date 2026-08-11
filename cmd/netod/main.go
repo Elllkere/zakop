@@ -25,6 +25,7 @@ import (
 	"github.com/elllkere/neto/internal/dnsproxy"
 	"github.com/elllkere/neto/internal/importer"
 	"github.com/elllkere/neto/internal/nft"
+	"github.com/elllkere/neto/internal/outboundpool"
 	"github.com/elllkere/neto/internal/provider"
 	"github.com/elllkere/neto/internal/singbox"
 	"github.com/elllkere/neto/internal/status"
@@ -504,7 +505,30 @@ func commandRun(opts options) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	return dnsproxy.New(cfg).Run(ctx)
+	if len(cfg.OutboundPools) == 0 {
+		return dnsproxy.New(cfg).Run(ctx)
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := make(chan error, 2)
+	go func() {
+		errCh <- dnsproxy.New(cfg).Run(runCtx)
+	}()
+	go func() {
+		manager := outboundpool.New(cfg, func(format string, args ...any) {
+			fmt.Fprintf(os.Stderr, format+"\n", args...)
+		})
+		errCh <- manager.Run(runCtx)
+	}()
+
+	firstErr := <-errCh
+	cancel()
+	secondErr := <-errCh
+	if firstErr != nil {
+		return firstErr
+	}
+	return secondErr
 }
 
 func commandReady(opts readyOptions) error {
@@ -1013,6 +1037,22 @@ func withTemporaryProxy(cfg config.Config, updateOutbound string, fn func(proxy 
 }
 
 func withTemporaryProxyDo(cfg config.Config, updateOutbound string, fn func(proxy string) error) error {
+	candidates := cfg.OutboundCandidateTags(updateOutbound)
+	if len(candidates) == 0 {
+		return fmt.Errorf("update_via proxy requires update_outbound or at least one custom outbound")
+	}
+	var failures []string
+	for _, candidate := range candidates {
+		if err := withTemporaryProxyCandidate(cfg, candidate, fn); err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", candidate, err))
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("all outbound candidates failed: %s", strings.Join(failures, "; "))
+}
+
+func withTemporaryProxyCandidate(cfg config.Config, updateOutbound string, fn func(proxy string) error) error {
 	if !singbox.BinaryExists(cfg.Main.SingBoxBin) {
 		return fmt.Errorf("sing-box binary is missing or not executable: %s", cfg.Main.SingBoxBin)
 	}

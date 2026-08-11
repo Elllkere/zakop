@@ -150,6 +150,12 @@ function outboundTagExists(wanted) {
 		if (tag == wanted && tag != 'direct' && tag != 'blocked' && tag != 'block' && tag != 'proxy_default')
 			found = true;
 	});
+	uci.sections('neto', 'outbound_pool', function(section, sid) {
+		var tag = String(section.tag || sid || section['.name'] || '').trim();
+
+		if (tag == wanted && tag != 'direct' && tag != 'blocked' && tag != 'block' && tag != 'proxy_default')
+			found = true;
+	});
 
 	return found;
 }
@@ -260,6 +266,13 @@ function addOutboundChoices(option) {
 		if (first == '')
 			first = tag;
 		option.value(tag, label || tag);
+	});
+	uci.sections('neto', 'outbound_pool', function(section, sid) {
+		var tag = String(section.tag || sid || section['.name'] || '').trim();
+		var label = String(section.label || section.name || tag).trim();
+
+		if (tag != '' && tag != 'direct' && tag != 'blocked' && tag != 'block' && tag != 'proxy_default')
+			option.value(tag, _('Pool: %s').format(label || tag));
 	});
 
 	option.default = first;

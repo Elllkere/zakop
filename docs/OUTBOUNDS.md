@@ -67,9 +67,47 @@ proxy, not curl process startup time and not an ICMP echo to the server address.
 This also verifies that proxy authentication and transport settings work. The
 test does not create an `auto`/`urltest` routing outbound or change rule routing.
 
+## Priority Pools
+
+`config outbound_pool` groups at least two concrete outbounds in strict priority
+order. Pools are managed on the Outbounds page and appear anywhere neto offers
+an outbound selector: rules, proxy clients, simple mode, proxy DNS, provider and
+subscription updates, and the neto updater.
+
+```uci
+config outbound_pool 'main_pool'
+	option label 'Main failover'
+	list outbound 'primary'
+	list outbound 'backup'
+	option check_url 'https://www.gstatic.com/generate_204'
+	option check_interval '60'
+```
+
+The list order is the priority order. netod checks `primary` first and stops at
+the first successful sing-box delay probe. It selects that member through the
+localhost-only sing-box Clash API. If `primary` recovers, the next check returns
+the pool to it. This is deterministic failover, not URLTest lowest-latency load
+balancing. A selection change interrupts existing connections so new
+connections immediately use the selected member.
+
+Pool constraints:
+
+- tags are unique across concrete outbounds and pools;
+- members are unique concrete outbounds; nested pools are not supported;
+- a pool needs at least two members;
+- `check_interval` is 5-86400 seconds;
+- `check_url` must be an HTTP or HTTPS URL;
+- the management controller defaults to `127.0.0.1:19090` and never adds
+  router-self nft/TProxy routing.
+
+If every member is unavailable, netod keeps the last selector value and retries
+with a short bounded backoff until one member works. Temporary proxy operations
+(subscription/provider/self updates) do not use the running selector: they try
+the pool members directly and sequentially in priority order.
+
 ## Rule Selection
 
-Rule with `action=proxy` выбирает custom outbound:
+Rule with `action=proxy` выбирает custom outbound или priority pool:
 
 ```uci
 config rule

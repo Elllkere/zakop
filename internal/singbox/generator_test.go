@@ -74,6 +74,36 @@ func TestGenerateBuiltinOutbounds(t *testing.T) {
 	}
 }
 
+func TestGenerateOrderedOutboundPoolSelector(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Outbounds = []config.Outbound{
+		{Enabled: true, Tag: "primary", Type: "trojan", Server: "primary.example", Port: 443, Password: "one", TLS: true},
+		{Enabled: true, Tag: "backup", Type: "shadowsocks", Server: "backup.example", Port: 8388, Method: "aes-128-gcm", Password: "two"},
+	}
+	cfg.OutboundPools = []config.OutboundPool{{
+		Tag: "priority_pool", Outbounds: []string{"primary", "backup"}, CheckURL: "https://example.com/generate_204", CheckInterval: 60,
+	}}
+
+	raw, err := Generate(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selector := generatedOutbound(t, cfg, "priority_pool")
+	if selector["type"] != "selector" || selector["default"] != "primary" || selector["interrupt_exist_connections"] != true {
+		t.Fatalf("unexpected selector: %+v", selector)
+	}
+	wantMembers := []any{"primary", "backup"}
+	if got := selector["outbounds"].([]any); len(got) != 2 || got[0] != wantMembers[0] || got[1] != wantMembers[1] {
+		t.Fatalf("unexpected selector priority: %+v", got)
+	}
+	text := string(raw)
+	for _, want := range []string{`"external_controller": "127.0.0.1:19090"`, `"tag": "tproxy-0002-in"`, `"outbound": "priority_pool"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("pool config missing %s:\n%s", want, text)
+		}
+	}
+}
+
 func TestGenerateDoTDNSServer(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Main.DNSUpstreamPreset = "custom"

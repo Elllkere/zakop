@@ -1422,6 +1422,91 @@ config outbound 'second'
 	}
 }
 
+func TestParseOutboundPoolAndAllowItAsRoutingTarget(t *testing.T) {
+	cfg, err := Parse(`
+config outbound 'primary'
+	option type 'vless'
+	option server 'primary.example.com'
+	option port '443'
+	option uuid 'a3482e88-686a-4a58-8126-99c9df64b060'
+
+config outbound 'backup'
+	option type 'trojan'
+	option server 'backup.example.com'
+	option port '443'
+	option password 'secret'
+
+config outbound_pool 'priority_pool'
+	option label 'Priority pool'
+	list outbound 'primary'
+	list outbound 'backup'
+	option check_url 'https://example.com/generate_204'
+	option check_interval '30'
+
+config rule 'pooled_rule'
+	option action 'proxy'
+	option outbound 'priority_pool'
+	list domain_equals 'example.com'
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.OutboundPools) != 1 {
+		t.Fatalf("unexpected pools: %+v", cfg.OutboundPools)
+	}
+	pool := cfg.OutboundPools[0]
+	if pool.Tag != "priority_pool" || pool.Label != "Priority pool" || pool.CheckInterval != 30 {
+		t.Fatalf("unexpected pool: %+v", pool)
+	}
+	if !reflect.DeepEqual(pool.Outbounds, []string{"primary", "backup"}) {
+		t.Fatalf("unexpected pool priority: %+v", pool.Outbounds)
+	}
+	if cfg.Rules[0].Outbound != "priority_pool" {
+		t.Fatalf("unexpected rule outbound: %+v", cfg.Rules[0])
+	}
+	if got := cfg.OutboundCandidateTags("priority_pool"); !reflect.DeepEqual(got, []string{"primary", "backup"}) {
+		t.Fatalf("unexpected candidates: %+v", got)
+	}
+	if got := cfg.ProxyTargetTags(); !reflect.DeepEqual(got, []string{"primary", "backup", "priority_pool"}) {
+		t.Fatalf("unexpected proxy targets: %+v", got)
+	}
+}
+
+func TestParseRejectsInvalidOutboundPools(t *testing.T) {
+	const outbounds = `
+config outbound 'primary'
+	option type 'vless'
+	option server 'primary.example.com'
+	option port '443'
+	option uuid 'a3482e88-686a-4a58-8126-99c9df64b060'
+
+config outbound 'backup'
+	option type 'trojan'
+	option server 'backup.example.com'
+	option port '443'
+	option password 'secret'
+`
+	tests := []struct {
+		name string
+		pool string
+		want string
+	}{
+		{"one member", "config outbound_pool 'pool'\n\tlist outbound 'primary'\n", "at least two"},
+		{"unknown member", "config outbound_pool 'pool'\n\tlist outbound 'primary'\n\tlist outbound 'missing'\n", "unknown outbound"},
+		{"duplicate member", "config outbound_pool 'pool'\n\tlist outbound 'primary'\n\tlist outbound 'primary'\n", "duplicate outbound"},
+		{"duplicate tag", "config outbound_pool 'primary'\n\tlist outbound 'primary'\n\tlist outbound 'backup'\n", "duplicate outbound or pool tag"},
+		{"invalid URL", "config outbound_pool 'pool'\n\tlist outbound 'primary'\n\tlist outbound 'backup'\n\toption check_url 'not-a-url'\n", "invalid check_url"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Parse(outbounds + test.pool)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("got %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestParseRuleCustomOutbound(t *testing.T) {
 	cfg, err := Parse(`
 config outbound 'my_vless'

@@ -104,6 +104,76 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 	}
 }
 
+func TestOutboundsLuCIExposesPriorityPools(t *testing.T) {
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+	for _, want := range []string{
+		"form.GridSection, 'outbound_pool'",
+		"pool.nodescriptions = true",
+		"form.DynamicList, 'outbound', _('Priority order')",
+		"o.textvalue = function(section_id)",
+		"return poolPriorityText(section_id)",
+		"section.label || section.name || tag",
+		"display:flex;width:100%;min-width:0;max-width:100%",
+		"min-width:5ch;max-width:100%;overflow:hidden;text-overflow:ellipsis",
+		"form.Value, 'check_url'",
+		"form.Value, 'check_interval'",
+		"concreteOutboundTagExists(members[i])",
+		"The top outbound has the highest priority.",
+		"uci.sections('neto', 'outbound_pool'",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("outbounds.js missing pool behavior %q:\n%s", want, s)
+		}
+	}
+}
+
+func TestEveryProxyOutboundSelectorIncludesPools(t *testing.T) {
+	paths := []string{
+		"../../embedded/files/www/luci-static/resources/view/neto/general.js",
+		"../../embedded/files/www/luci-static/resources/view/neto/clients.js",
+		"../../embedded/files/www/luci-static/resources/view/neto/rules.js",
+		"../../embedded/files/www/luci-static/resources/view/neto/providers.js",
+		"../../embedded/files/www/luci-static/resources/view/neto/outbounds.js",
+	}
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(data), "uci.sections('neto', 'outbound_pool'") {
+			t.Fatalf("%s does not include outbound pools", path)
+		}
+	}
+}
+
+func TestOutboundActionsDoNotCreateSyntheticPoolTagChanges(t *testing.T) {
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(data)
+	for _, forbidden := range []string{
+		"function normalizePools()",
+		"uci.set('neto', sid, 'tag', sid);\n\n\t\tif (String(uci.get('neto', sid, 'label')",
+	} {
+		if strings.Contains(s, forbidden) {
+			t.Fatalf("outbounds.js must not create synthetic pool changes %q:\n%s", forbidden, s)
+		}
+	}
+	for _, want := range []string{
+		"uci.unload('neto')",
+		"return ui.changes.init()",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("outbounds.js missing post-commit refresh %q:\n%s", want, s)
+		}
+	}
+}
+
 func TestOutboundsLuCITableOnlySectionNameTypeAddressPortAndLatency(t *testing.T) {
 	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
 	if err != nil {

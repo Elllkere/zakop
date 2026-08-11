@@ -95,6 +95,21 @@ initially, and LuCI does not create a proxy rule when none exists.
 The Outbounds page can test every proxy profile and sort the results by HTTP
 latency. The same JSON report is available with `netod outbounds latency`.
 
+The page also supports strict-priority failover pools. netod checks members in
+list order, selects the first reachable outbound, moves to the next member when
+it fails, and automatically returns to the primary after recovery. Pools can be
+selected by rules, proxy clients, simple mode, proxy DNS, and
+subscription/provider/neto update settings.
+
+```uci
+config outbound_pool 'main_pool'
+	option label 'Main failover'
+	list outbound 'primary'
+	list outbound 'backup'
+	option check_url 'https://www.gstatic.com/generate_204'
+	option check_interval '60'
+```
+
 ## Status
 
 Supported:

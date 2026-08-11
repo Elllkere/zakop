@@ -166,6 +166,14 @@ func Generate(cfg config.Config) ([]byte, error) {
 			},
 		}
 	}
+	if len(cfg.OutboundPools) > 0 {
+		if doc.Experimental == nil {
+			doc.Experimental = map[string]any{}
+		}
+		doc.Experimental["clash_api"] = map[string]any{
+			"external_controller": cfg.Main.PoolController,
+		}
+	}
 
 	outbounds, err := generateOutbounds(cfg)
 	if err != nil {
@@ -337,6 +345,15 @@ func generateOutbounds(cfg config.Config) ([]any, error) {
 	for _, outbound := range cfg.EnabledCustomOutbounds() {
 		add(encodeOutbound(outbound))
 	}
+	for _, pool := range cfg.OutboundPools {
+		add(map[string]any{
+			"type":                        "selector",
+			"tag":                         pool.Tag,
+			"outbounds":                   pool.Outbounds,
+			"default":                     pool.Outbounds[0],
+			"interrupt_exist_connections": true,
+		})
+	}
 	return out, nil
 }
 
@@ -350,10 +367,8 @@ func firstCustomOutboundTag(cfg config.Config) string {
 func DNSProxyOutbound(cfg config.Config) string {
 	tag := strings.TrimSpace(cfg.Main.RealDNSOutbound)
 	if tag != "" && tag != config.BuiltinDirectOutbound && tag != config.BuiltinBlockedOutbound && tag != "block" && tag != "proxy_default" {
-		for _, outbound := range cfg.EnabledCustomOutbounds() {
-			if outbound.Tag == tag {
-				return tag
-			}
+		if _, ok := cfg.AllowedOutboundTags()[tag]; ok {
+			return tag
 		}
 	}
 	return firstCustomOutboundTag(cfg)

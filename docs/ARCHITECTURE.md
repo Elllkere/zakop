@@ -136,10 +136,18 @@ Order in `from_lan` chain:
 6. ordered IP/provider/CIDR rules -> the selected outbound TProxy target.
 7. default `return`.
 
-Each custom outbound has a generated TProxy inbound. Its port is
-`tproxy_port + outbound_index`, where `outbound_index` follows UCI section
-order. nftables therefore preserves the selected outbound for packet-level
-IP/CIDR rules without expanding provider CIDRs into sing-box rules.
+Each selectable custom outbound or outbound pool has a generated TProxy inbound.
+Concrete outbound ports come first in UCI order; pool ports are appended in UCI
+order, so adding a pool does not renumber existing outbound listeners. Its port
+is `tproxy_port + target_index`. nftables therefore preserves the selected
+outbound or pool for packet-level IP/CIDR rules without expanding provider CIDRs
+into sing-box rules.
+
+An outbound pool is emitted as a sing-box `selector`. netod probes its concrete
+members through the localhost-only Clash API in strict list order and selects
+the first healthy member. It repeats the ordered check periodically, which also
+returns a recovered higher-priority member to service. This management loop
+does not proxy transparent traffic and does not add router-self nft rules.
 
 FakeIP traffic initially enters the first TProxy inbound. Before sing-box route
 matching, FakeIP reverse mapping restores the domain; generated ordered domain

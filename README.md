@@ -293,6 +293,21 @@ rules. Пустых `Auto`/`Select outbound` в outbound selectors нет: но�
 получает первый custom outbound, а без единого custom outbound LuCI не дает
 создать proxy rule.
 
+На той же странице можно создать priority pool из двух или более outbounds.
+Порядок участников задает строгий приоритет: netod выбирает первый доступный,
+переключается на следующий при отказе и автоматически возвращается на основной
+после восстановления. Pool можно выбрать в rules, client policy, simple mode,
+proxy DNS и для обновлений subscriptions, providers и самого neto.
+
+```uci
+config outbound_pool 'main_pool'
+	option label 'Main failover'
+	list outbound 'primary'
+	list outbound 'backup'
+	option check_url 'https://www.gstatic.com/generate_204'
+	option check_interval '60'
+```
+
 Кнопка `Test latency` на странице Outbounds проверяет все серверы через их
 реальные proxy profiles с помощью URLTest самого sing-box. Результат выводится
 в отдельном столбце таблицы Outbounds, лучший доступный сервер подсвечивается.

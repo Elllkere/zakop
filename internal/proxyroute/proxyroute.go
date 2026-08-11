@@ -8,7 +8,9 @@ import (
 )
 
 // Target describes the stable nftables -> TProxy inbound mapping for one
-// custom outbound. The order follows UCI outbound section order.
+// selectable outbound or pool. Concrete outbounds keep their existing order
+// and pools are appended in UCI order so adding a pool does not renumber
+// existing TProxy listeners.
 type Target struct {
 	Tag     string
 	Chain   string
@@ -17,11 +19,11 @@ type Target struct {
 }
 
 func Targets(cfg config.Config) []Target {
-	outbounds := cfg.EnabledCustomOutbounds()
-	targets := make([]Target, 0, len(outbounds))
-	for i, outbound := range outbounds {
+	tags := cfg.ProxyTargetTags()
+	targets := make([]Target, 0, len(tags))
+	for i, tag := range tags {
 		targets = append(targets, Target{
-			Tag:     outbound.Tag,
+			Tag:     tag,
 			Chain:   fmt.Sprintf("to_proxy_%04d", i),
 			Inbound: fmt.Sprintf("tproxy-%04d-in", i),
 			Port:    cfg.Main.TProxyPort + i,
