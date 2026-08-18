@@ -7,7 +7,7 @@ import (
 )
 
 func TestRulesLuCINoMatchAllOrLegacyMatchers(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestRulesLuCINoMatchAllOrLegacyMatchers(t *testing.T) {
 }
 
 func TestRulesLuCIExplicitEnabledAndPriorityRewrite(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,9 +43,9 @@ func TestRulesLuCIExplicitEnabledAndPriorityRewrite(t *testing.T) {
 		"o.enabled = '1'",
 		"o.disabled = '0'",
 		"o.rmempty = false",
-		"uci.set('neto', sid, 'enabled', '1')",
-		"uci.set('neto', sid, 'dns_mode', 'auto')",
-		"uci.set('neto', sid, 'priority', String(n * 100))",
+		"uci.set('zakop', sid, 'enabled', '1')",
+		"uci.set('zakop', sid, 'dns_mode', 'auto')",
+		"uci.set('zakop', sid, 'priority', String(n * 100))",
 		"this.map.save(rewriteRuleState)",
 	} {
 		if !strings.Contains(s, want) {
@@ -58,7 +58,7 @@ func TestRulesLuCIExplicitEnabledAndPriorityRewrite(t *testing.T) {
 }
 
 func TestRulesLuCISortsRenderedRulesByPriority(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestRulesLuCISortsRenderedRulesByPriority(t *testing.T) {
 		"s.cfgsections = function()",
 		"sortRuleSectionIDs(form.GridSection.prototype.cfgsections.apply(this, arguments))",
 		"function renderedRuleSectionIDs(ids)",
-		"document.querySelectorAll('#cbi-neto-rule tr.cbi-section-table-row[data-sid]')",
+		"document.querySelectorAll('#cbi-zakop-rule tr.cbi-section-table-row[data-sid]')",
 		"function orderedRuleSectionIDs()",
 		"var ids = orderedRuleSectionIDs()",
 		"function nextRulePriority()",
@@ -106,14 +106,14 @@ func TestRulesLuCISortsRenderedRulesByPriority(t *testing.T) {
 }
 
 func TestRulesLuCIHiddenOutsideCustomMode(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
-		"if (String(uci.get('neto', 'main', 'routing_mode') || 'custom').trim() != 'custom')",
-		"routingMode = String(uci.get('neto', 'main', 'routing_mode') || 'custom').trim()",
+		"if (String(uci.get('zakop', 'main', 'routing_mode') || 'custom').trim() != 'custom')",
+		"routingMode = String(uci.get('zakop', 'main', 'routing_mode') || 'custom').trim()",
 		"if (routingMode != 'custom')",
 		"return m.render()",
 	} {
@@ -124,7 +124,7 @@ func TestRulesLuCIHiddenOutsideCustomMode(t *testing.T) {
 }
 
 func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
 		"function downloadTextFile(filename, text)",
 		"new Blob([ text ], { type: 'application/json' })",
 		"'download': filename",
-		"downloadTextFile('neto-rules.json', exportRulesJSON())",
+		"downloadTextFile('zakop-rules.json', exportRulesJSON())",
 		"function pickTextFile(accept)",
 		"'type': 'file'",
 		"'accept': accept",
@@ -156,12 +156,12 @@ func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
 		"if (isProviderRuleOption(option))",
 		"if (domainInput == 'provider')",
 		"if (ipInput == 'provider')",
-		"uci.set('neto', section_id, 'action', 'direct')",
-		"uci.set('neto', section_id, 'outbound', 'direct')",
-		"uci.set('neto', section_id, 'dns_mode', 'auto')",
-		"uci.remove('neto', sections[i])",
-		"return fs.exec('/sbin/uci', [ 'commit', 'neto' ])",
-		"fs.exec('/etc/init.d/neto', [ 'restart' ])",
+		"uci.set('zakop', section_id, 'action', 'direct')",
+		"uci.set('zakop', section_id, 'outbound', 'direct')",
+		"uci.set('zakop', section_id, 'dns_mode', 'auto')",
+		"uci.remove('zakop', sections[i])",
+		"return fs.exec('/sbin/uci', [ 'commit', 'zakop' ])",
+		"fs.exec('/etc/init.d/zakop', [ 'restart' ])",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("rules.js missing import/export safety behavior %q:\n%s", want, s)
@@ -181,7 +181,7 @@ func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
 }
 
 func TestRulesLuCIDNSModeHiddenAndAutomatic(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestRulesLuCIDNSModeHiddenAndAutomatic(t *testing.T) {
 		t.Fatalf("rules.js must not expose dns_mode in LuCI:\n%s", s)
 	}
 	for _, want := range []string{
-		"uci.set('neto', sid, 'dns_mode', 'auto')",
+		"uci.set('zakop', sid, 'dns_mode', 'auto')",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("rules.js missing automatic dns_mode behavior %q:\n%s", want, s)
@@ -199,7 +199,7 @@ func TestRulesLuCIDNSModeHiddenAndAutomatic(t *testing.T) {
 }
 
 func TestRulesLuCICompactTableFields(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestRulesLuCICompactTableFields(t *testing.T) {
 		"o.value('any', _('Any'))",
 		"o.value('tcp', _('TCP'))",
 		"o.value('udp', _('UDP'))",
-		"uci.unset('neto', section_id, 'proto')",
+		"uci.unset('zakop', section_id, 'proto')",
 		"form.DynamicList, 'src_port'",
 		"form.DynamicList, 'dst_port'",
 		"o.validate = validatePortMatch",
@@ -278,7 +278,7 @@ func TestRulesLuCICompactTableFields(t *testing.T) {
 }
 
 func TestRulesLuCIOutboundVisibleInTable(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,25 +338,25 @@ func TestRulesLuCIOutboundVisibleInTable(t *testing.T) {
 }
 
 func TestRulesLuCIInputModesNormalizePersistence(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/rules.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
-		"uci.set('neto', sid, 'domain_input', domainInput)",
-		"uci.set('neto', sid, 'ip_input', ipInput)",
-		"uci.unset('neto', sid, 'domain_provider')",
-		"uci.unset('neto', sid, 'ip_provider')",
-		"uci.unset('neto', sid, 'domain_file')",
-		"uci.unset('neto', sid, 'ip_file')",
+		"uci.set('zakop', sid, 'domain_input', domainInput)",
+		"uci.set('zakop', sid, 'ip_input', ipInput)",
+		"uci.unset('zakop', sid, 'domain_provider')",
+		"uci.unset('zakop', sid, 'ip_provider')",
+		"uci.unset('zakop', sid, 'domain_file')",
+		"uci.unset('zakop', sid, 'ip_file')",
 		"else if (optionValues(sid, 'domain_file').length > 0)",
 		"else if (optionValues(sid, 'ip_file').length > 0 || optionValues(sid, 'file').length > 0)",
 		"else if (domainInput == 'file')",
 		"else if (ipInput == 'file')",
 		"addProviderChoices(o, providerType)",
 		"setListOption(section_id, target, splitTextValues(formvalue))",
-		"uci.set('neto', section_id, option, values)",
+		"uci.set('zakop', section_id, option, values)",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("rules.js missing persistence behavior %q:\n%s", want, s)

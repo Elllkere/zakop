@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func TestLocalRouteStatusMissingTable(t *testing.T) {
@@ -26,7 +26,7 @@ func TestListenerPresentBusyBoxNetstat(t *testing.T) {
 Active Internet connections (only servers)
 Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
 tcp        0      0 127.0.0.1:15353         0.0.0.0:*               LISTEN      123/sing-box
-udp        0      0 127.0.0.1:5353          0.0.0.0:*                           124/netod
+udp        0      0 127.0.0.1:5353          0.0.0.0:*                           124/zakopd
 udp        0      0 127.0.0.1:16001         0.0.0.0:*                           123/sing-box
 `
 	for _, addr := range []string{"127.0.0.1:15353", "127.0.0.1:5353", "127.0.0.1:16001"} {

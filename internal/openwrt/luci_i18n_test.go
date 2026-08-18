@@ -7,7 +7,7 @@ import (
 )
 
 func TestLuCII18nModuleUsesBaseclassConstructor(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/neto/i18n.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/zakop/i18n.js")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,7 @@
 'require uci';
 
 var ru = {
-	'neto': 'neto',
+	'zakop': 'zakop',
 	'General': 'Основное',
 	'Advanced': 'Дополнительно',
 	'Rules': 'Правила',
@@ -27,13 +27,13 @@ var ru = {
 	'Disabled': 'Выключен',
 	'Unknown': 'Неизвестно',
 	'Version': 'Версия',
-	'neto status': 'Статус neto',
+	'zakop status': 'Статус zakop',
 	'sing-box status': 'Статус sing-box',
-	'netod version': 'Версия netod',
+	'zakopd version': 'Версия zakopd',
 	'sing-box version': 'Версия sing-box',
-	'Latest neto release': 'Последний релиз neto',
+	'Latest zakop release': 'Последний релиз zakop',
 	'Update status': 'Статус обновления',
-	'neto update': 'Обновление neto',
+	'zakop update': 'Обновление zakop',
 	'Checking for updates...': 'Проверка обновлений...',
 	'Update available': 'Доступно обновление',
 	'Up to date': 'Установлена актуальная версия',
@@ -41,7 +41,7 @@ var ru = {
 	'Downloading and installing the latest release...': 'Загрузка и установка последнего релиза...',
 	'Update installed. Reconnecting to LuCI...': 'Обновление установлено. Переподключение к LuCI...',
 	'Connection interrupted. Reconnecting to verify the installed version...': 'Соединение прервано. Переподключение для проверки установленной версии...',
-	'Install the latest neto release now? The neto service will restart.': 'Установить последний релиз neto сейчас? Сервис neto будет перезапущен.',
+	'Install the latest zakop release now? The zakop service will restart.': 'Установить последний релиз zakop сейчас? Сервис zakop будет перезапущен.',
 	'Language': 'Язык',
 	'English': 'Английский',
 	'Russian': 'Русский',
@@ -57,7 +57,7 @@ var ru = {
 	'Direct': 'direct',
 	'Blocked': 'blocked',
 	'Block': 'block',
-	'DNS listen': 'DNS-адрес neto',
+	'DNS listen': 'DNS-адрес zakop',
 	'DNS': 'DNS',
 	'DNS server': 'DNS-сервер',
 	'DNS upstream': 'DNS upstream',
@@ -103,7 +103,7 @@ var ru = {
 	'Policy': 'Политика',
 	'Default': 'По умолчанию',
 	'Proxy': 'proxy',
-	'Default follows general routing mode. Proxy forces non-reserved traffic through neto. Direct bypasses neto completely.': 'Default следует общему режиму маршрутизации. Proxy принудительно отправляет нерезервированный трафик через neto. Direct полностью обходит neto.',
+	'Default follows general routing mode. Proxy forces non-reserved traffic through zakop. Direct bypasses zakop completely.': 'Default следует общему режиму маршрутизации. Proxy принудительно отправляет нерезервированный трафик через zakop. Direct полностью обходит zakop.',
 	'These are literal string operations, not DNS-aware matching.': 'Это буквальные строковые операции, а не DNS-aware сопоставление.',
 	'For root + subdomains, use Equals: example.com and Ends with: .example.com': 'Для корня и поддоменов используйте Equals: example.com и Ends with: .example.com',
 	'Rule details': 'Детали правила',
@@ -173,7 +173,7 @@ var ru = {
 	'URL provider notes': 'Подсказки URL provider',
 	'Script provider notes': 'Подсказки Script provider',
 	'Use a plain text URL with one domain, IPv4 address, or IPv4 CIDR per line. Use Script for JSON feeds or custom filtering.': 'Используйте plain text URL с одним доменом, IPv4-адресом или IPv4 CIDR на строку. Для JSON feeds или своей фильтрации используйте Script.',
-	'Use an absolute executable path. The script must print the final list to stdout or write it to NETO_PROVIDER_OUTPUT; one item per line. In proxy mode, neto exports NETO_PROVIDER_PROXY and HTTP_PROXY/HTTPS_PROXY/ALL_PROXY to the script.': 'Укажите абсолютный исполняемый путь. Скрипт должен вывести финальный список в stdout или записать его в NETO_PROVIDER_OUTPUT; один элемент на строку. В режиме proxy neto передаёт скрипту NETO_PROVIDER_PROXY и HTTP_PROXY/HTTPS_PROXY/ALL_PROXY.',
+	'Use an absolute executable path. The script must print the final list to stdout or write it to ZAKOP_PROVIDER_OUTPUT; one item per line. In proxy mode, zakop exports ZAKOP_PROVIDER_PROXY and HTTP_PROXY/HTTPS_PROXY/ALL_PROXY to the script.': 'Укажите абсолютный исполняемый путь. Скрипт должен вывести финальный список в stdout или записать его в ZAKOP_PROVIDER_OUTPUT; один элемент на строку. В режиме proxy zakop передаёт скрипту ZAKOP_PROVIDER_PROXY и HTTP_PROXY/HTTPS_PROXY/ALL_PROXY.',
 	'Import provider presets': 'Импортировать presets провайдеров',
 	'Provider presets already exist': 'Presets провайдеров уже добавлены',
 	'Rule "%s" references missing provider "%s". Remove the provider from the rule before deleting it.': 'Правило "%s" ссылается на отсутствующего провайдера "%s". Уберите провайдера из правила перед удалением.',
@@ -256,7 +256,7 @@ var ru = {
 	'Update time': 'Время обновления',
 	'Update via': 'Обновлять через',
 	'Update outbound': 'Исходящий для обновления',
-	'Choose how neto release checks and downloads are performed. Save & Apply before updating.': 'Выберите способ проверки и загрузки обновлений neto. Перед обновлением нажмите «Сохранить и применить».',
+	'Choose how zakop release checks and downloads are performed. Save & Apply before updating.': 'Выберите способ проверки и загрузки обновлений zakop. Перед обновлением нажмите «Сохранить и применить».',
 	'Nodes': 'Ноды',
 	'Updated': 'Обновлено',
 	'Update': 'Обновить',
@@ -266,7 +266,7 @@ var ru = {
 	'Updating %d/%d…': 'Обновление %d/%d…',
 	'No enabled subscriptions configured': 'Нет включённых подписок',
 	'No providers configured': 'Нет настроенных провайдеров',
-	'Restart failed': 'Не удалось перезапустить neto',
+	'Restart failed': 'Не удалось перезапустить zakop',
 	'Some subscriptions failed to update. Successful updates were kept.': 'Некоторые подписки не обновились. Успешные обновления сохранены.',
 	'Some providers failed to update. Successful updates were kept.': 'Некоторые провайдеры не обновились. Успешные обновления сохранены.',
 	'Reload the page to show successful updates.': 'Перезагрузите страницу, чтобы увидеть успешные обновления.',
@@ -283,11 +283,11 @@ var ru = {
 };
 
 function ruAvailable() {
-	return uci.get('neto', 'main', 'language_ru_installed') == '1';
+	return uci.get('zakop', 'main', 'language_ru_installed') == '1';
 }
 
 function currentLanguage() {
-	return String(uci.get('neto', 'main', 'language') || 'en').trim();
+	return String(uci.get('zakop', 'main', 'language') || 'en').trim();
 }
 
 function translate(text) {

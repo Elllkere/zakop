@@ -21,7 +21,7 @@ func TestPlanEnsureIdempotent(t *testing.T) {
 	}
 }
 
-func TestPlanCleanupOnlyNetoOwned(t *testing.T) {
+func TestPlanCleanupOnlyZakopOwned(t *testing.T) {
 	cfg := Config{Mark: "0x101", Table: 101}
 	rules := "" +
 		"100: from all fwmark 0x999 lookup 101\n" +

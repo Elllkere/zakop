@@ -9,7 +9,7 @@ import (
 )
 
 func TestEmbeddedDefaultConfigHasNoSampleClientsOrRules(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/etc/config/neto")
+	data, err := os.ReadFile("../../embedded/files/etc/config/zakop")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,15 +61,15 @@ func TestInstallerDetectsLANSubnetAndConfiguresLanguage(t *testing.T) {
 		"--language en|ru",
 		"install Russian LuCI localization",
 		"LANGUAGE_CHOICE=\"ru\"",
-		"uci set neto.main.language='ru'",
-		"uci set neto.main.language_ru_installed='1'",
+		"uci set zakop.main.language='ru'",
+		"uci set zakop.main.language_ru_installed='1'",
 		"ip -4 route show dev br-lan scope link",
 		"ipcalc.sh \"$ipaddr\" \"$netmask\"",
 		"network_from_ip_prefix",
 		"normalized=\"$(network_from_ip_prefix \"$ipaddr\" \"$prefix\"",
 		"ensure_lan_subnet_config",
-		"chmod 0755 /usr/share/neto/run-sing-box-log.sh",
-		"chmod 0755 /usr/share/neto/check-version.sh",
+		"chmod 0755 /usr/share/zakop/run-sing-box-log.sh",
+		"chmod 0755 /usr/share/zakop/check-version.sh",
 		"curl_usable()",
 		"curl -fsSL --connect-timeout 10 --max-time 300 \"$url\" -o \"$tmp\"",
 		"wget -T 20 -t 2 -O \"$tmp\" \"$url\"",
@@ -78,20 +78,20 @@ func TestInstallerDetectsLANSubnetAndConfiguresLanguage(t *testing.T) {
 		"warning: /usr/bin/curl is installed but cannot start",
 		"atomic_install()",
 		"mv -f \"$tmp\" \"$dest\"",
-		"atomic_install \"$WORK_DIR/bin/$arch/netod\" /usr/bin/netod",
+		"atomic_install \"$WORK_DIR/bin/$arch/zakopd\" /usr/bin/zakopd",
 		"existing installation detected; preserving config and skipping package installation",
 		"verify_installed_version",
 		"restart_luci_deferred",
 		"fix_luci_permissions",
-		"/www/luci-static/resources/view/neto/*.js",
-		"/usr/share/rpcd/acl.d/luci-app-neto.json",
+		"/www/luci-static/resources/view/zakop/*.js",
+		"/usr/share/rpcd/acl.d/luci-app-zakop.json",
 		"chmod 0644 \"$path\"",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("installer missing %q:\n%s", want, s)
 		}
 	}
-	if strings.Contains(s, "neto.$section.enabled") {
+	if strings.Contains(s, "zakop.$section.enabled") {
 		t.Fatalf("installer must not write provider enabled fields:\n%s", s)
 	}
 	for _, forbidden := range []string{
@@ -100,7 +100,7 @@ func TestInstallerDetectsLANSubnetAndConfiguresLanguage(t *testing.T) {
 		"ensure_builtin_script_provider",
 		"provider_url_exists",
 		"provider_script_exists",
-		"uci set \"neto.$section=provider\"",
+		"uci set \"zakop.$section=provider\"",
 	} {
 		if strings.Contains(s, forbidden) {
 			t.Fatalf("installer must not auto-create provider sections %q:\n%s", forbidden, s)
@@ -108,12 +108,64 @@ func TestInstallerDetectsLANSubnetAndConfiguresLanguage(t *testing.T) {
 	}
 }
 
-func TestVersionCheckWrapperCannotTriggerUpgrade(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/usr/share/neto/check-version.sh")
+func TestInstallerMigratesLegacyNetoOnlyBeforeVerifiedCleanup(t *testing.T) {
+	data, err := os.ReadFile("../../embedded/install.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat("../../embedded/files/usr/share/neto/check-version.sh")
+	s := string(data)
+	for _, want := range []string{
+		"legacy_neto_detected()",
+		"prepare_legacy_neto_migration()",
+		"cleanup_legacy_neto_installation()",
+		"/etc/rc.d/S*neto",
+		"/etc/rc.d/K*neto",
+		"/usr/libexec/neto",
+		"/var/lib/neto",
+		"/tmp/neto-import.txt",
+		"/etc/init.d/neto stop",
+		"cp /etc/config/neto /etc/config/zakop",
+		"cp -R /etc/neto/. /etc/zakop/",
+		"cp -R /usr/share/neto/. /usr/share/zakop/",
+		"cp -R /var/lib/neto/providers/. /etc/zakop/provider-cache/",
+		"s#/usr/libexec/neto/#/usr/libexec/zakop/#g",
+		"s#/etc/neto/#/etc/zakop/#g",
+		"s#/var/lib/neto/providers/#/etc/zakop/provider-cache/#g",
+		"atomic_install \"$old_managed\" \"$MANAGED_SINGBOX\"",
+		"/tmp/neto-install.*",
+		"/tmp/neto-upgrade.*",
+		"/tmp/neto-go-cache",
+		"/etc/init.d/cron reload",
+		"/etc/init.d/dnsmasq reload",
+		"legacy neto files removed after successful zakop startup",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("installer legacy migration missing %q:\n%s", want, s)
+		}
+	}
+	prepare := strings.Index(s, "prepare_legacy_neto_migration\n")
+	restart := strings.LastIndex(s, "restart_zakop_safely\n")
+	cleanup := strings.LastIndex(s, "cleanup_legacy_neto_installation\n")
+	if prepare < 0 || restart < 0 || cleanup < 0 || prepare > restart || restart > cleanup {
+		t.Fatalf("legacy cleanup must happen only after zakop startup verification:\n%s", s)
+	}
+	for _, want := range []string{
+		`$0 ~ /\/usr\/bin\/netod([[:space:]]|$)/ { next }`,
+		`$0 ~ /\/etc\/init\.d\/neto([[:space:]]|$)/ { next }`,
+		`$0 ~ /\/usr\/share\/neto(\/|[[:space:]]|$)/ { next }`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("installer must remove standalone legacy cron entry %q:\n%s", want, s)
+		}
+	}
+}
+
+func TestVersionCheckWrapperCannotTriggerUpgrade(t *testing.T) {
+	data, err := os.ReadFile("../../embedded/files/usr/share/zakop/check-version.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat("../../embedded/files/usr/share/zakop/check-version.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +173,7 @@ func TestVersionCheckWrapperCannotTriggerUpgrade(t *testing.T) {
 		t.Fatal("check-version.sh is not executable")
 	}
 	s := string(data)
-	if !strings.Contains(s, "exec /usr/share/neto/upgrade.sh --check") {
+	if !strings.Contains(s, "exec /usr/share/zakop/upgrade.sh --check") {
 		t.Fatalf("version wrapper must force check-only mode:\n%s", s)
 	}
 }
@@ -137,7 +189,7 @@ func TestUpgradeScriptFallsBackAroundBrokenCurl(t *testing.T) {
 		"--check) MODE=\"check\"",
 		"--luci) MODE=\"luci\"",
 		"latest_version()",
-		"neto-version.txt",
+		"zakop-version.txt",
 		"RELEASE_API_URL",
 		"status=\"available\"",
 		"printf 'current=%s\\nlatest=%s\\nstatus=%s\\n'",
@@ -146,12 +198,12 @@ func TestUpgradeScriptFallsBackAroundBrokenCurl(t *testing.T) {
 		"wget -T 20 -t 2 -O \"$tmp\" \"$url\"",
 		"attempts=\"$attempts broken-curl\"",
 		"download \"$INSTALL_URL\" \"$TMP\"",
-		"NETO_EXPECT_VERSION=\"$expected\" sh \"$TMP\"",
-		"neto upgrade: verified installed version $actual",
-		"UPGRADE_LOG=\"${NETO_UPGRADE_LOG:-/tmp/neto/upgrade.log}\"",
-		"UPDATE_VIA=\"${NETO_UPDATE_VIA:-}\"",
-		"UPDATE_OUTBOUND=\"${NETO_UPDATE_OUTBOUND:-}\"",
-		"\"$NETOD_BIN\" download -url \"$url\" -output \"$dest\" -via proxy",
+		"ZAKOP_EXPECT_VERSION=\"$expected\" sh \"$TMP\"",
+		"zakop upgrade: verified installed version $actual",
+		"UPGRADE_LOG=\"${ZAKOP_UPGRADE_LOG:-/tmp/zakop/upgrade.log}\"",
+		"UPDATE_VIA=\"${ZAKOP_UPDATE_VIA:-}\"",
+		"UPDATE_OUTBOUND=\"${ZAKOP_UPDATE_OUTBOUND:-}\"",
+		"\"$ZAKOPD_BIN\" download -url \"$url\" -output \"$dest\" -via proxy",
 		"download \"$ARCHIVE_URL\" \"$ARCHIVE_TMP\"",
 		"sh \"$TMP\" --local \"$ARCHIVE_TMP\"",
 	} {
@@ -167,7 +219,7 @@ func TestUpgradeScriptProxyDownloadsInstallerAndArchive(t *testing.T) {
 	versionSource := filepath.Join(dir, "latest-version")
 	installerSource := filepath.Join(dir, "installer.sh")
 	archiveSource := filepath.Join(dir, "archive.tar.gz")
-	netodPath := filepath.Join(dir, "netod")
+	zakopdPath := filepath.Join(dir, "zakopd")
 	downloadArgsPath := filepath.Join(dir, "download.args")
 	installerArgsPath := filepath.Join(dir, "installer.args")
 	upgradeLogPath := filepath.Join(dir, "upgrade.log")
@@ -182,22 +234,22 @@ func TestUpgradeScriptProxyDownloadsInstallerAndArchive(t *testing.T) {
 		}
 	}
 	installer := `#!/bin/sh
-printf '%s\n' "$@" > "$NETO_FAKE_INSTALLER_ARGS"
+printf '%s\n' "$@" > "$ZAKOP_FAKE_INSTALLER_ARGS"
 [ "$1" = "--local" ] || exit 20
 [ -s "$2" ] || exit 21
-printf 'v1.0.1\n' > "$NETO_FAKE_VERSION_STATE"
+printf 'v1.0.1\n' > "$ZAKOP_FAKE_VERSION_STATE"
 `
 	if err := os.WriteFile(installerSource, []byte(installer), 0755); err != nil {
 		t.Fatal(err)
 	}
-	fakeNetod := `#!/bin/sh
+	fakeZakopd := `#!/bin/sh
 case "$1" in
 version)
-	printf 'netod %s\n' "$(cat "$NETO_FAKE_VERSION_STATE")"
+	printf 'zakopd %s\n' "$(cat "$ZAKOP_FAKE_VERSION_STATE")"
 	;;
 download)
 	shift
-	printf '%s\n' "$@" >> "$NETO_FAKE_DOWNLOAD_ARGS"
+	printf '%s\n' "$@" >> "$ZAKOP_FAKE_DOWNLOAD_ARGS"
 	url=''
 	output=''
 	while [ "$#" -gt 0 ]; do
@@ -208,36 +260,36 @@ download)
 		esac
 	done
 	case "$url" in
-	*neto-version.txt) cp "$NETO_FAKE_VERSION_SOURCE" "$output" ;;
-	*install.sh) cp "$NETO_FAKE_INSTALLER_SOURCE" "$output" ;;
-	*archive.tar.gz) cp "$NETO_FAKE_ARCHIVE_SOURCE" "$output" ;;
+	*zakop-version.txt) cp "$ZAKOP_FAKE_VERSION_SOURCE" "$output" ;;
+	*install.sh) cp "$ZAKOP_FAKE_INSTALLER_SOURCE" "$output" ;;
+	*archive.tar.gz) cp "$ZAKOP_FAKE_ARCHIVE_SOURCE" "$output" ;;
 	*) exit 22 ;;
 	esac
 	;;
 *) exit 23 ;;
 esac
 `
-	if err := os.WriteFile(netodPath, []byte(fakeNetod), 0755); err != nil {
+	if err := os.WriteFile(zakopdPath, []byte(fakeZakopd), 0755); err != nil {
 		t.Fatal(err)
 	}
 
 	cmd := exec.Command("sh", "../../embedded/upgrade.sh")
 	cmd.Env = append(os.Environ(),
 		"TMPDIR="+dir,
-		"NETO_NETOD_BIN="+netodPath,
-		"NETO_INSTALL_URL=https://example.test/install.sh",
-		"NETO_VERSION_URL=https://example.test/neto-version.txt",
-		"NETO_RELEASE_API_URL=https://example.test/release-api",
-		"NETO_ARCHIVE_URL=https://example.test/archive.tar.gz",
-		"NETO_UPDATE_VIA=proxy",
-		"NETO_UPDATE_OUTBOUND=proxy1",
-		"NETO_UPGRADE_LOG="+upgradeLogPath,
-		"NETO_FAKE_VERSION_STATE="+statePath,
-		"NETO_FAKE_VERSION_SOURCE="+versionSource,
-		"NETO_FAKE_INSTALLER_SOURCE="+installerSource,
-		"NETO_FAKE_ARCHIVE_SOURCE="+archiveSource,
-		"NETO_FAKE_DOWNLOAD_ARGS="+downloadArgsPath,
-		"NETO_FAKE_INSTALLER_ARGS="+installerArgsPath,
+		"ZAKOP_ZAKOPD_BIN="+zakopdPath,
+		"ZAKOP_INSTALL_URL=https://example.test/install.sh",
+		"ZAKOP_VERSION_URL=https://example.test/zakop-version.txt",
+		"ZAKOP_RELEASE_API_URL=https://example.test/release-api",
+		"ZAKOP_ARCHIVE_URL=https://example.test/archive.tar.gz",
+		"ZAKOP_UPDATE_VIA=proxy",
+		"ZAKOP_UPDATE_OUTBOUND=proxy1",
+		"ZAKOP_UPGRADE_LOG="+upgradeLogPath,
+		"ZAKOP_FAKE_VERSION_STATE="+statePath,
+		"ZAKOP_FAKE_VERSION_SOURCE="+versionSource,
+		"ZAKOP_FAKE_INSTALLER_SOURCE="+installerSource,
+		"ZAKOP_FAKE_ARCHIVE_SOURCE="+archiveSource,
+		"ZAKOP_FAKE_DOWNLOAD_ARGS="+downloadArgsPath,
+		"ZAKOP_FAKE_INSTALLER_ARGS="+installerArgsPath,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("proxy upgrade failed: %v\n%s", err, out)
@@ -302,14 +354,14 @@ func TestInstallerWaitsForCleanServiceRestartAfterUpdate(t *testing.T) {
 	}
 	s := string(data)
 	for _, want := range []string{
-		"neto_service_pids()",
-		`ubus call service list '{"name":"neto"}'`,
-		"restart_neto_safely()",
-		`/etc/init.d/neto stop`,
+		"zakop_service_pids()",
+		`ubus call service list '{"name":"zakop"}'`,
+		"restart_zakop_safely()",
+		`/etc/init.d/zakop stop`,
 		`kill -0 "$pid"`,
-		`/etc/init.d/neto start`,
-		`/etc/init.d/neto running`,
-		"neto_runtime_ready()",
+		`/etc/init.d/zakop start`,
+		`/etc/init.d/zakop running`,
+		"zakop_runtime_ready()",
 		`"dns_listener: present"`,
 		`"tproxy_listener: present"`,
 		"networking was returned to direct mode",
@@ -318,13 +370,13 @@ func TestInstallerWaitsForCleanServiceRestartAfterUpdate(t *testing.T) {
 			t.Fatalf("installer safe restart missing %q:\n%s", want, s)
 		}
 	}
-	if strings.Count(s, `/etc/init.d/neto stop >/dev/null 2>&1 || true`) < 3 {
+	if strings.Count(s, `/etc/init.d/zakop stop >/dev/null 2>&1 || true`) < 3 {
 		t.Fatalf("installer must return networking to direct mode on every restart failure path:\n%s", s)
 	}
-	if strings.Contains(s, "/etc/init.d/neto restart\n") {
+	if strings.Contains(s, "/etc/init.d/zakop restart\n") {
 		t.Fatalf("installer must not race old and new procd instances with a single restart action:\n%s", s)
 	}
-	updateRestart := `restart_neto_safely
+	updateRestart := `restart_zakop_safely
 if [ "$EXISTING_INSTALL" -eq 1 ]; then
 	# The first start replaces the procd instance definitions`
 	if !strings.Contains(s, updateRestart) ||
@@ -334,7 +386,7 @@ if [ "$EXISTING_INSTALL" -eq 1 ]; then
 }
 
 func TestEmbeddedSingBoxLogWrapperIsInstalledAsset(t *testing.T) {
-	path := "../../embedded/files/usr/share/neto/run-sing-box-log.sh"
+	path := "../../embedded/files/usr/share/zakop/run-sing-box-log.sh"
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -349,10 +401,10 @@ func TestEmbeddedSingBoxLogWrapperIsInstalledAsset(t *testing.T) {
 	s := string(data)
 	for _, want := range []string{
 		"#!/bin/sh",
-		"/tmp/neto/sing-box.log",
+		"/tmp/zakop/sing-box.log",
 		"tail -c \"$log_keep_bytes\"",
 		"\"$bin\" run -c \"$config\" >> \"$log_file\" 2>&1 &",
-		`"$netod_bin" ready`,
+		`"$zakopd_bin" ready`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("%s missing %q:\n%s", path, want, s)
@@ -362,11 +414,11 @@ func TestEmbeddedSingBoxLogWrapperIsInstalledAsset(t *testing.T) {
 
 func TestEmbeddedProviderScriptsAreInstalledAssets(t *testing.T) {
 	for _, path := range []string{
-		"../../embedded/files/usr/share/neto/providers/akamai-ipv4.sh",
-		"../../embedded/files/usr/share/neto/providers/aws-ipv4.sh",
-		"../../embedded/files/usr/share/neto/providers/aws-full-ipv4.sh",
-		"../../embedded/files/usr/share/neto/providers/aws-full-eu-ipv4.sh",
-		"../../embedded/files/usr/share/neto/providers/google-cloud-eu-ipv4.sh",
+		"../../embedded/files/usr/share/zakop/providers/akamai-ipv4.sh",
+		"../../embedded/files/usr/share/zakop/providers/aws-ipv4.sh",
+		"../../embedded/files/usr/share/zakop/providers/aws-full-ipv4.sh",
+		"../../embedded/files/usr/share/zakop/providers/aws-full-eu-ipv4.sh",
+		"../../embedded/files/usr/share/zakop/providers/google-cloud-eu-ipv4.sh",
 	} {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -382,7 +434,7 @@ func TestEmbeddedProviderScriptsAreInstalledAssets(t *testing.T) {
 		s := string(data)
 		for _, want := range []string{
 			"#!/bin/sh",
-			"NETO_PROVIDER_OUTPUT",
+			"ZAKOP_PROVIDER_OUTPUT",
 			"curl -fsSL",
 			"command -v jq",
 		} {
@@ -397,7 +449,7 @@ func TestEmbeddedProviderScriptsAreInstalledAssets(t *testing.T) {
 }
 
 func TestEmbeddedGoogleCloudProviderScriptFiltersEuropeanIPv4Ranges(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/usr/share/neto/providers/google-cloud-eu-ipv4.sh")
+	data, err := os.ReadFile("../../embedded/files/usr/share/zakop/providers/google-cloud-eu-ipv4.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,11 +468,11 @@ func TestEmbeddedGoogleCloudProviderScriptFiltersEuropeanIPv4Ranges(t *testing.T
 }
 
 func TestEmbeddedAWSProviderScriptsAreSplitByService(t *testing.T) {
-	cdnData, err := os.ReadFile("../../embedded/files/usr/share/neto/providers/aws-ipv4.sh")
+	cdnData, err := os.ReadFile("../../embedded/files/usr/share/zakop/providers/aws-ipv4.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fullData, err := os.ReadFile("../../embedded/files/usr/share/neto/providers/aws-full-ipv4.sh")
+	fullData, err := os.ReadFile("../../embedded/files/usr/share/zakop/providers/aws-full-ipv4.sh")
 	if err != nil {
 		t.Fatal(err)
 	}

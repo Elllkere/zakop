@@ -5,9 +5,9 @@ import (
 	"net"
 	"os"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/policy"
-	"github.com/elllkere/neto/internal/ruleengine"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/policy"
+	"github.com/elllkere/zakop/internal/ruleengine"
 )
 
 func LoadRuleCIDRs(cfg config.Config) (map[int][]*net.IPNet, error) {
@@ -55,7 +55,7 @@ func LoadRuleCIDRs(cfg config.Config) (map[int][]*net.IPNet, error) {
 							return nil, err
 						}
 					}
-					fmt.Fprintf(os.Stderr, "warning: provider %q cache %q is missing; skipping provider until netod providers update %s\n", provider.Name, cachePath, provider.Name)
+					fmt.Fprintf(os.Stderr, "warning: provider %q cache %q is missing; skipping provider until zakopd providers update %s\n", provider.Name, cachePath, provider.Name)
 					continue
 				}
 				return nil, err

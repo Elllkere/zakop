@@ -1,0 +1,29 @@
+{
+  "luci-app-zakop": {
+    "description": "Grant access to zakop",
+    "read": {
+      "uci": [ "zakop" ],
+      "file": {
+        "/bin/pidof": [ "exec" ],
+        "/etc/init.d/zakop": [ "exec" ],
+        "/usr/bin/zakopd": [ "exec" ],
+        "/usr/share/zakop/check-version.sh": [ "exec" ],
+        "/usr/bin/sing-box": [ "exec" ],
+        "/usr/libexec/zakop/sing-box": [ "exec" ],
+        "/etc/config/zakop": [ "read" ],
+        "/tmp/zakop/zakop.nft": [ "read" ],
+        "/tmp/zakop/sing-box.json": [ "read" ]
+      }
+    },
+    "write": {
+      "uci": [ "zakop" ],
+      "file": {
+        "/tmp/zakop-import.txt": [ "read", "write" ],
+        "/sbin/uci": [ "exec" ],
+        "/usr/bin/zakopd": [ "exec" ],
+        "/usr/share/zakop/upgrade.sh": [ "exec" ],
+        "/etc/init.d/zakop": [ "exec" ]
+      }
+    }
+  }
+}

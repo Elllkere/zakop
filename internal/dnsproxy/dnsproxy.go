@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/ruleengine"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/ruleengine"
 )
 
 type Proxy struct {
@@ -84,7 +84,7 @@ func (p Proxy) Run(ctx context.Context) error {
 		"real-proxy":  p.RealProxyUpstream,
 	} {
 		if upstream == p.Listen {
-			return fmt.Errorf("%s DNS upstream points back to neto DNS listener", label)
+			return fmt.Errorf("%s DNS upstream points back to zakop DNS listener", label)
 		}
 	}
 

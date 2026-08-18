@@ -2,7 +2,7 @@
 
 Этот файл фиксирует project decisions, которые нельзя случайно откатывать.
 
-## D1: neto Routes Before sing-box
+## D1: zakop Routes Before sing-box
 
 Routing decisions происходят в `nftables` до входа traffic в `sing-box`.
 
@@ -14,23 +14,23 @@ Consequences:
 
 ## D2: sing-box Owns FakeIP
 
-`neto` не реализует FakeIP allocator в v1. `sing-box` владеет FakeIP и
+`zakop` не реализует FakeIP allocator в v1. `sing-box` владеет FakeIP и
 FakeIP-to-domain mapping.
 
 Consequences:
 
 - FakeIP DNS queries идут в sing-box;
-- `netod` may forward DNS but must not synthesize FakeIP addresses itself.
+- `zakopd` may forward DNS but must not synthesize FakeIP addresses itself.
 
-## D3: netod Is Not a Transparent Proxy
+## D3: zakopd Is Not a Transparent Proxy
 
-`netod` не обрабатывает transparent TCP/UDP data-plane traffic.
+`zakopd` не обрабатывает transparent TCP/UDP data-plane traffic.
 
 Consequences:
 
 - TProxy target is sing-box;
-- `netod` manages config, DNS forwarding, nft, status;
-- `netod` must not become proxy engine.
+- `zakopd` manages config, DNS forwarding, nft, status;
+- `zakopd` must not become proxy engine.
 
 ## D4: nftables/firewall4 Only
 
@@ -38,7 +38,7 @@ Consequences:
 
 ## D5: LAN-Only Capture
 
-`neto` routes only LAN client traffic. WAN, inbound, router self и non-LAN
+`zakop` routes only LAN client traffic. WAN, inbound, router self и non-LAN
 prerouting traffic must return before any proxy rule.
 
 Consequences:
@@ -58,7 +58,7 @@ manually.
 If system `sing-box` is missing or incompatible, managed sing-box lives at:
 
 ```text
-/usr/libexec/neto/sing-box
+/usr/libexec/zakop/sing-box
 ```
 
 Never overwrite:
@@ -127,13 +127,13 @@ Consequence:
 
 ## D13: DNS Transport Belongs To sing-box
 
-`netod` is DNS policy layer only. Normal-path DoH/DoT/DoQ clients must not be
-implemented in Go inside `netod`.
+`zakopd` is DNS policy layer only. Normal-path DoH/DoT/DoQ clients must not be
+implemented in Go inside `zakopd`.
 
 Consequences:
 
-- DNS query enters netod on `dns_listen`;
-- netod selects `fakeip`, `real-direct`, `real-proxy`, or `block`;
+- DNS query enters zakopd on `dns_listen`;
+- zakopd selects `fakeip`, `real-direct`, `real-proxy`, or `block`;
 - raw DNS wire query is forwarded to local sing-box DNS listener;
 - sing-box handles UDP/TCP/DoT/DoH transport.
 

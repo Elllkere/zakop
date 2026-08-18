@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/tproxy"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/tproxy"
 )
 
 func Summary(cfg config.Config) string {
@@ -106,7 +106,7 @@ func listOrDash(values []string) string {
 }
 
 func nftTableStatus() string {
-	err := exec.Command("nft", "list", "table", "inet", "neto").Run()
+	err := exec.Command("nft", "list", "table", "inet", "zakop").Run()
 	if err != nil {
 		return "missing"
 	}

@@ -4,11 +4,11 @@ START=92
 STOP=12
 USE_PROCD=1
 
-CONFIG_NAME="neto"
-NETOD="/usr/bin/netod"
-DNSMASQ_SNIPPET="neto.conf"
-DNSMASQ_STATE_DIR="/etc/neto/dnsmasq-state"
-DNSMASQ_LEGACY_STATE_DIR="/var/lib/neto"
+CONFIG_NAME="zakop"
+ZAKOPD="/usr/bin/zakopd"
+DNSMASQ_SNIPPET="zakop.conf"
+DNSMASQ_STATE_DIR="/etc/zakop/dnsmasq-state"
+DNSMASQ_LEGACY_STATE_DIR="/var/lib/zakop"
 DNSMASQ_SERVER_STATE="$DNSMASQ_STATE_DIR/dnsmasq-server.prev"
 DNSMASQ_NORESOLV_STATE="$DNSMASQ_STATE_DIR/dnsmasq-noresolv.prev"
 DNSMASQ_ADDSUBNET_STATE="$DNSMASQ_STATE_DIR/dnsmasq-addsubnet.prev"
@@ -16,24 +16,24 @@ DNSMASQ_LEGACY_SERVER_STATE="$DNSMASQ_LEGACY_STATE_DIR/dnsmasq-server.prev"
 DNSMASQ_LEGACY_NORESOLV_STATE="$DNSMASQ_LEGACY_STATE_DIR/dnsmasq-noresolv.prev"
 DNSMASQ_LEGACY_ADDSUBNET_STATE="$DNSMASQ_LEGACY_STATE_DIR/dnsmasq-addsubnet.prev"
 CRON_FILE="/etc/crontabs/root"
-CRON_BEGIN="# neto subscriptions begin"
-CRON_END="# neto subscriptions end"
+CRON_BEGIN="# zakop subscriptions begin"
+CRON_END="# zakop subscriptions end"
 
-neto_reload_dnsmasq() {
+zakop_reload_dnsmasq() {
 	[ -x /etc/init.d/dnsmasq ] || return 0
 	/etc/init.d/dnsmasq reload >/dev/null 2>&1 || /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 }
 
-neto_reload_cron() {
+zakop_reload_cron() {
 	[ -x /etc/init.d/cron ] || return 0
 	/etc/init.d/cron reload >/dev/null 2>&1 || /etc/init.d/cron restart >/dev/null 2>&1 || true
 }
 
-neto_state_exists() {
+zakop_state_exists() {
 	[ -f "$1" ] || [ -f "$2" ]
 }
 
-neto_read_state() {
+zakop_read_state() {
 	if [ -f "$1" ]; then
 		cat "$1"
 		return 0
@@ -45,11 +45,11 @@ neto_read_state() {
 	return 1
 }
 
-neto_remove_state() {
+zakop_remove_state() {
 	rm -f "$1" "$2"
 }
 
-neto_is_neto_dnsmasq_server() {
+zakop_is_zakop_dnsmasq_server() {
 	local value="$1" current="$2" saved="$3"
 
 	[ -n "$current" ] && [ "$value" = "$current" ] && return 0
@@ -58,22 +58,22 @@ neto_is_neto_dnsmasq_server() {
 	return 1
 }
 
-neto_dnsmasq_has_non_neto_server() {
+zakop_dnsmasq_has_non_zakop_server() {
 	local current="$1" saved="$2" value servers
 
 	servers="$(uci -q get dhcp.@dnsmasq[0].server || true)"
 	for value in $servers; do
-		if ! neto_is_neto_dnsmasq_server "$value" "$current" "$saved"; then
+		if ! zakop_is_zakop_dnsmasq_server "$value" "$current" "$saved"; then
 			return 0
 		fi
 	done
 	return 1
 }
 
-neto_remove_cron() {
+zakop_remove_cron() {
 	local tmp
 	[ -f "$CRON_FILE" ] || return 0
-	tmp="/tmp/neto-cron.$$"
+	tmp="/tmp/zakop-cron.$$"
 	awk -v begin="$CRON_BEGIN" -v end="$CRON_END" '
 		$0 == begin { skip = 1; next }
 		$0 == end { skip = 0; next }
@@ -81,10 +81,10 @@ neto_remove_cron() {
 	' "$CRON_FILE" >"$tmp"
 	cat "$tmp" >"$CRON_FILE"
 	rm -f "$tmp"
-	neto_reload_cron
+	zakop_reload_cron
 }
 
-neto_interval_minutes() {
+zakop_interval_minutes() {
 	local value="$1" n
 
 	case "$value" in
@@ -110,7 +110,7 @@ neto_interval_minutes() {
 	esac
 }
 
-neto_interval_cron_spec() {
+zakop_interval_cron_spec() {
 	local interval="$1"
 
 	case "$interval" in
@@ -141,7 +141,7 @@ neto_interval_cron_spec() {
 	esac
 }
 
-neto_append_subscription_cron() {
+zakop_append_subscription_cron() {
 	local section="$1" enabled auto_update schedule interval cron_spec hour minute
 	config_get_bool enabled "$section" enabled 1
 	config_get_bool auto_update "$section" auto_update 0
@@ -155,10 +155,10 @@ neto_append_subscription_cron() {
 	if [ "$schedule" = "interval" ]; then
 		config_get interval "$section" update_interval_minutes ""
 		[ -n "$interval" ] || config_get interval "$section" update_interval "360"
-		interval="$(neto_interval_minutes "$interval" 2>/dev/null || true)"
-		cron_spec="$(neto_interval_cron_spec "$interval" 2>/dev/null || true)"
-		[ -n "$cron_spec" ] || cron_spec="$(neto_interval_cron_spec "360")"
-		printf "%s /usr/bin/netod subscriptions update %s >/dev/null 2>&1 && /etc/init.d/neto restart >/dev/null 2>&1\n" "$cron_spec" "$section" >>"$NETO_CRON_LINES"
+		interval="$(zakop_interval_minutes "$interval" 2>/dev/null || true)"
+		cron_spec="$(zakop_interval_cron_spec "$interval" 2>/dev/null || true)"
+		[ -n "$cron_spec" ] || cron_spec="$(zakop_interval_cron_spec "360")"
+		printf "%s /usr/bin/zakopd subscriptions update %s >/dev/null 2>&1 && /etc/init.d/zakop restart >/dev/null 2>&1\n" "$cron_spec" "$section" >>"$ZAKOP_CRON_LINES"
 		return 0
 	fi
 	config_get hour "$section" update_hour "0"
@@ -175,10 +175,10 @@ neto_append_subscription_cron() {
 			;;
 	esac
 	[ "$minute" -ge 0 ] && [ "$minute" -le 59 ] || minute="0"
-	printf "%s %s * * * /usr/bin/netod subscriptions update %s >/dev/null 2>&1 && /etc/init.d/neto restart >/dev/null 2>&1\n" "$minute" "$hour" "$section" >>"$NETO_CRON_LINES"
+	printf "%s %s * * * /usr/bin/zakopd subscriptions update %s >/dev/null 2>&1 && /etc/init.d/zakop restart >/dev/null 2>&1\n" "$minute" "$hour" "$section" >>"$ZAKOP_CRON_LINES"
 }
 
-neto_append_provider_cron() {
+zakop_append_provider_cron() {
 	local section="$1" auto_update schedule interval cron_spec hour minute
 	config_get_bool auto_update "$section" auto_update 0
 	[ "$auto_update" -eq 1 ] || return 0
@@ -191,10 +191,10 @@ neto_append_provider_cron() {
 	if [ "$schedule" = "interval" ]; then
 		config_get interval "$section" update_interval_minutes ""
 		[ -n "$interval" ] || config_get interval "$section" update_interval "360"
-		interval="$(neto_interval_minutes "$interval" 2>/dev/null || true)"
-		cron_spec="$(neto_interval_cron_spec "$interval" 2>/dev/null || true)"
-		[ -n "$cron_spec" ] || cron_spec="$(neto_interval_cron_spec "360")"
-		printf "%s /usr/bin/netod providers update %s >/dev/null 2>&1 && /etc/init.d/neto restart >/dev/null 2>&1\n" "$cron_spec" "$section" >>"$NETO_CRON_LINES"
+		interval="$(zakop_interval_minutes "$interval" 2>/dev/null || true)"
+		cron_spec="$(zakop_interval_cron_spec "$interval" 2>/dev/null || true)"
+		[ -n "$cron_spec" ] || cron_spec="$(zakop_interval_cron_spec "360")"
+		printf "%s /usr/bin/zakopd providers update %s >/dev/null 2>&1 && /etc/init.d/zakop restart >/dev/null 2>&1\n" "$cron_spec" "$section" >>"$ZAKOP_CRON_LINES"
 		return 0
 	fi
 	config_get hour "$section" update_hour "0"
@@ -211,24 +211,24 @@ neto_append_provider_cron() {
 			;;
 	esac
 	[ "$minute" -ge 0 ] && [ "$minute" -le 59 ] || minute="5"
-	printf "%s %s * * * /usr/bin/netod providers update %s >/dev/null 2>&1 && /etc/init.d/neto restart >/dev/null 2>&1\n" "$minute" "$hour" "$section" >>"$NETO_CRON_LINES"
+	printf "%s %s * * * /usr/bin/zakopd providers update %s >/dev/null 2>&1 && /etc/init.d/zakop restart >/dev/null 2>&1\n" "$minute" "$hour" "$section" >>"$ZAKOP_CRON_LINES"
 }
 
-neto_write_cron() {
+zakop_write_cron() {
 	local tmp lines
 	mkdir -p "$(dirname "$CRON_FILE")"
 	touch "$CRON_FILE"
-	tmp="/tmp/neto-cron.$$"
-	lines="/tmp/neto-cron-lines.$$"
+	tmp="/tmp/zakop-cron.$$"
+	lines="/tmp/zakop-cron-lines.$$"
 	awk -v begin="$CRON_BEGIN" -v end="$CRON_END" '
 		$0 == begin { skip = 1; next }
 		$0 == end { skip = 0; next }
 		!skip { print }
 	' "$CRON_FILE" >"$tmp"
 	: >"$lines"
-	NETO_CRON_LINES="$lines"
-	config_foreach neto_append_subscription_cron subscription
-	config_foreach neto_append_provider_cron provider
+	ZAKOP_CRON_LINES="$lines"
+	config_foreach zakop_append_subscription_cron subscription
+	config_foreach zakop_append_provider_cron provider
 	if [ -s "$lines" ]; then
 		printf "%s\n" "$CRON_BEGIN" >>"$tmp"
 		cat "$lines" >>"$tmp"
@@ -236,10 +236,10 @@ neto_write_cron() {
 	fi
 	cat "$tmp" >"$CRON_FILE"
 	rm -f "$tmp" "$lines"
-	neto_reload_cron
+	zakop_reload_cron
 }
 
-neto_write_dnsmasq() {
+zakop_write_dnsmasq() {
 	local dns_listen manage host port server old_server old_noresolv old_addsubnet
 	config_get_bool manage main manage_dnsmasq 1
 	[ "$manage" -eq 1 ] || return 0
@@ -248,7 +248,7 @@ neto_write_dnsmasq() {
 	port="${dns_listen##*:}"
 	[ -n "$host" ] && [ -n "$port" ] || return 1
 	server="$host#$port"
-	old_server="$(neto_read_state "$DNSMASQ_SERVER_STATE" "$DNSMASQ_LEGACY_SERVER_STATE" 2>/dev/null || true)"
+	old_server="$(zakop_read_state "$DNSMASQ_SERVER_STATE" "$DNSMASQ_LEGACY_SERVER_STATE" 2>/dev/null || true)"
 
 	mkdir -p "$DNSMASQ_STATE_DIR"
 	if [ -n "$old_server" ] && [ "$old_server" != "$server" ]; then
@@ -256,9 +256,9 @@ neto_write_dnsmasq() {
 	fi
 	printf "%s\n" "$server" >"$DNSMASQ_SERVER_STATE"
 
-	if ! neto_state_exists "$DNSMASQ_NORESOLV_STATE" "$DNSMASQ_LEGACY_NORESOLV_STATE"; then
+	if ! zakop_state_exists "$DNSMASQ_NORESOLV_STATE" "$DNSMASQ_LEGACY_NORESOLV_STATE"; then
 		old_noresolv="$(uci -q get dhcp.@dnsmasq[0].noresolv || true)"
-		if [ "$old_noresolv" = "1" ] && ! neto_dnsmasq_has_non_neto_server "$server" "$old_server"; then
+		if [ "$old_noresolv" = "1" ] && ! zakop_dnsmasq_has_non_zakop_server "$server" "$old_server"; then
 			printf "__missing__\n" >"$DNSMASQ_NORESOLV_STATE"
 		elif [ -n "$old_noresolv" ]; then
 			printf "%s\n" "$old_noresolv" >"$DNSMASQ_NORESOLV_STATE"
@@ -266,9 +266,9 @@ neto_write_dnsmasq() {
 			printf "__missing__\n" >"$DNSMASQ_NORESOLV_STATE"
 		fi
 	fi
-	if ! neto_state_exists "$DNSMASQ_ADDSUBNET_STATE" "$DNSMASQ_LEGACY_ADDSUBNET_STATE"; then
+	if ! zakop_state_exists "$DNSMASQ_ADDSUBNET_STATE" "$DNSMASQ_LEGACY_ADDSUBNET_STATE"; then
 		old_addsubnet="$(uci -q get dhcp.@dnsmasq[0].addsubnet || true)"
-		if [ "$old_addsubnet" = "32" ] && ! neto_dnsmasq_has_non_neto_server "$server" "$old_server"; then
+		if [ "$old_addsubnet" = "32" ] && ! zakop_dnsmasq_has_non_zakop_server "$server" "$old_server"; then
 			printf "__missing__\n" >"$DNSMASQ_ADDSUBNET_STATE"
 		elif [ -n "$old_addsubnet" ]; then
 			printf "%s\n" "$old_addsubnet" >"$DNSMASQ_ADDSUBNET_STATE"
@@ -283,16 +283,16 @@ neto_write_dnsmasq() {
 	uci set dhcp.@dnsmasq[0].addsubnet='32'
 	uci commit dhcp
 	rm -f /tmp/dnsmasq.d/$DNSMASQ_SNIPPET /etc/dnsmasq.d/$DNSMASQ_SNIPPET
-	neto_reload_dnsmasq
+	zakop_reload_dnsmasq
 }
 
-neto_remove_dnsmasq() {
+zakop_remove_dnsmasq() {
 	local dns_listen host port server saved_server old_noresolv old_addsubnet current_noresolv current_addsubnet
 	config_get dns_listen main dns_listen "127.0.0.1:5353"
 	host="${dns_listen%:*}"
 	port="${dns_listen##*:}"
 	server="$host#$port"
-	saved_server="$(neto_read_state "$DNSMASQ_SERVER_STATE" "$DNSMASQ_LEGACY_SERVER_STATE" 2>/dev/null || true)"
+	saved_server="$(zakop_read_state "$DNSMASQ_SERVER_STATE" "$DNSMASQ_LEGACY_SERVER_STATE" 2>/dev/null || true)"
 
 	uci -q del_list dhcp.@dnsmasq[0].server="$server" || true
 	if [ -n "$saved_server" ] && [ "$saved_server" != "$server" ]; then
@@ -302,14 +302,14 @@ neto_remove_dnsmasq() {
 		uci -q del_list dhcp.@dnsmasq[0].server="127.0.0.1#5353" || true
 	fi
 
-	if old_noresolv="$(neto_read_state "$DNSMASQ_NORESOLV_STATE" "$DNSMASQ_LEGACY_NORESOLV_STATE" 2>/dev/null)"; then
+	if old_noresolv="$(zakop_read_state "$DNSMASQ_NORESOLV_STATE" "$DNSMASQ_LEGACY_NORESOLV_STATE" 2>/dev/null)"; then
 		if [ "$old_noresolv" = "__missing__" ]; then
 			uci -q delete dhcp.@dnsmasq[0].noresolv || true
 		else
 			uci set dhcp.@dnsmasq[0].noresolv="$old_noresolv"
 		fi
 	fi
-	if old_addsubnet="$(neto_read_state "$DNSMASQ_ADDSUBNET_STATE" "$DNSMASQ_LEGACY_ADDSUBNET_STATE" 2>/dev/null)"; then
+	if old_addsubnet="$(zakop_read_state "$DNSMASQ_ADDSUBNET_STATE" "$DNSMASQ_LEGACY_ADDSUBNET_STATE" 2>/dev/null)"; then
 		if [ "$old_addsubnet" = "__missing__" ]; then
 			uci -q delete dhcp.@dnsmasq[0].addsubnet || true
 		else
@@ -317,19 +317,19 @@ neto_remove_dnsmasq() {
 		fi
 	fi
 	current_noresolv="$(uci -q get dhcp.@dnsmasq[0].noresolv || true)"
-	if [ "$current_noresolv" = "1" ] && ! neto_dnsmasq_has_non_neto_server "$server" "$saved_server"; then
+	if [ "$current_noresolv" = "1" ] && ! zakop_dnsmasq_has_non_zakop_server "$server" "$saved_server"; then
 		uci -q delete dhcp.@dnsmasq[0].noresolv || true
 	fi
 	current_addsubnet="$(uci -q get dhcp.@dnsmasq[0].addsubnet || true)"
-	if [ "$current_addsubnet" = "32" ] && ! neto_dnsmasq_has_non_neto_server "$server" "$saved_server"; then
+	if [ "$current_addsubnet" = "32" ] && ! zakop_dnsmasq_has_non_zakop_server "$server" "$saved_server"; then
 		uci -q delete dhcp.@dnsmasq[0].addsubnet || true
 	fi
-	neto_remove_state "$DNSMASQ_SERVER_STATE" "$DNSMASQ_LEGACY_SERVER_STATE"
-	neto_remove_state "$DNSMASQ_NORESOLV_STATE" "$DNSMASQ_LEGACY_NORESOLV_STATE"
-	neto_remove_state "$DNSMASQ_ADDSUBNET_STATE" "$DNSMASQ_LEGACY_ADDSUBNET_STATE"
+	zakop_remove_state "$DNSMASQ_SERVER_STATE" "$DNSMASQ_LEGACY_SERVER_STATE"
+	zakop_remove_state "$DNSMASQ_NORESOLV_STATE" "$DNSMASQ_LEGACY_NORESOLV_STATE"
+	zakop_remove_state "$DNSMASQ_ADDSUBNET_STATE" "$DNSMASQ_LEGACY_ADDSUBNET_STATE"
 	uci commit dhcp
 	rm -f /tmp/dnsmasq.d/$DNSMASQ_SNIPPET /etc/dnsmasq.d/$DNSMASQ_SNIPPET
-	neto_reload_dnsmasq
+	zakop_reload_dnsmasq
 }
 
 start_service() {
@@ -343,14 +343,14 @@ start_service() {
 		stop_service
 		return 0
 	fi
-	config_get singbox_bin main singbox_bin "/usr/libexec/neto/sing-box"
+	config_get singbox_bin main singbox_bin "/usr/libexec/zakop/sing-box"
 
-	"$NETOD" check || return 1
-	"$NETOD" compile || return 1
-	"$singbox_bin" check -c /tmp/neto/sing-box.json || return 1
+	"$ZAKOPD" check || return 1
+	"$ZAKOPD" compile || return 1
+	"$singbox_bin" check -c /tmp/zakop/sing-box.json || return 1
 
-	procd_open_instance netod
-	procd_set_param command "$NETOD" run
+	procd_open_instance zakopd
+	procd_set_param command "$ZAKOPD" run
 	procd_set_param term_timeout 3
 	procd_set_param respawn 3600 5 5
 	procd_set_param stdout 1
@@ -358,7 +358,7 @@ start_service() {
 	procd_close_instance
 
 	procd_open_instance sing-box
-	procd_set_param command /usr/share/neto/run-sing-box-log.sh "$singbox_bin" /tmp/neto/sing-box.json
+	procd_set_param command /usr/share/zakop/run-sing-box-log.sh "$singbox_bin" /tmp/zakop/sing-box.json
 	procd_set_param term_timeout 3
 	procd_set_param respawn 3600 5 5
 	procd_close_instance
@@ -372,11 +372,11 @@ service_started() {
 	[ "$enabled" -eq 1 ] || return 0
 
 	# Do not expose dnsmasq or LAN policy to half-started local DNS services.
-	# The end-to-end probe covers netod and the selected sing-box real-DNS path.
-	"$NETOD" ready -timeout 30s || return 1
-	"$NETOD" apply || return 1
-	neto_write_dnsmasq
-	neto_write_cron
+	# The end-to-end probe covers zakopd and the selected sing-box real-DNS path.
+	"$ZAKOPD" ready -timeout 30s || return 1
+	"$ZAKOPD" apply || return 1
+	zakop_write_dnsmasq
+	zakop_write_cron
 }
 
 stop_service() {
@@ -386,19 +386,19 @@ stop_service() {
 	config_get mark main mark "0x101"
 	config_get table main table "101"
 
-	nft delete table inet neto 2>/dev/null || true
+	nft delete table inet zakop 2>/dev/null || true
 	while ip -4 rule del fwmark "$mark" table "$table" 2>/dev/null; do
 		:
 	done
 	ip -4 route del local default dev lo table "$table" 2>/dev/null || true
-	neto_remove_dnsmasq
-	neto_remove_cron
+	zakop_remove_dnsmasq
+	zakop_remove_cron
 }
 
-neto_add_interface_trigger() {
+zakop_add_interface_trigger() {
 	local section="$1"
 
-	# Router-local traffic is deliberately outside neto policy, and loopback
+	# Router-local traffic is deliberately outside zakop policy, and loopback
 	# changes must not restart the service. Watch every other logical network
 	# so custom LAN/WAN names recover just like the usual lan/wan sections.
 	[ "$section" = "loopback" ] && return 0
@@ -408,5 +408,5 @@ neto_add_interface_trigger() {
 service_triggers() {
 	procd_add_reload_trigger "$CONFIG_NAME" network
 	config_load network
-	config_foreach neto_add_interface_trigger interface
+	config_foreach zakop_add_interface_trigger interface
 }

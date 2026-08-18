@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestLuCILogsPageUsesNetodLogCommand(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/logs.js")
+func TestLuCILogsPageUsesZakopdLogCommand(t *testing.T) {
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/logs.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,9 +15,9 @@ func TestLuCILogsPageUsesNetodLogCommand(t *testing.T) {
 	for _, want := range []string{
 		"'require fs'",
 		"'require ui'",
-		"fs.exec('/usr/bin/netod', args)",
-		"netod([ 'logs', 'sing-box' ])",
-		"fs.exec('/usr/bin/netod', [ 'logs', 'sing-box', 'clear' ])",
+		"fs.exec('/usr/bin/zakopd', args)",
+		"zakopd([ 'logs', 'sing-box' ])",
+		"fs.exec('/usr/bin/zakopd', [ 'logs', 'sing-box', 'clear' ])",
 		"handleRefresh: function()",
 		"handleClear: function(button)",
 		"sing-box Logs",

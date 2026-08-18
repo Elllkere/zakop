@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func TestApplyManualNodesAppendsOutbounds(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "neto")
+	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`
 config main 'main'
 	option enabled '1'
@@ -50,7 +50,7 @@ config main 'main'
 }
 
 func TestApplyManualNodesUsesUniqueTags(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "neto")
+	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`
 config main 'main'
 	option enabled '1'
@@ -103,7 +103,7 @@ config main 'main'
 }
 
 func TestApplySubscriptionNodesReplacesOnlyMatchingSource(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "neto")
+	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`
 config subscription 'sub1'
 	option url 'https://example.com/sub'
@@ -164,7 +164,7 @@ config outbound 'old'
 }
 
 func TestApplySubscriptionNodesKeepsStableTagOnRepeatUpdate(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "neto")
+	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`
 config subscription 'sub1'
 	option url 'https://example.com/sub'
@@ -207,7 +207,7 @@ config subscription 'sub1'
 }
 
 func TestApplySubscriptionNodesPreservesTagUsedByRule(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "neto")
+	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`
 config subscription 'sub1'
 	option url 'https://example.com/sub'

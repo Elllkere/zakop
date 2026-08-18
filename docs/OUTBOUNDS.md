@@ -52,13 +52,13 @@ does not stop the remaining tests.
 
 The all-outbounds CLI command processes large subscriptions in batches of 32,
 with four requests in parallel inside each batch. The temporary test does not
-add nftables rules and does not route router self traffic through neto TProxy.
+add nftables rules and does not route router self traffic through zakop TProxy.
 
 The same report is available as JSON from the CLI:
 
 ```sh
-netod outbounds latency
-netod outbounds latency my_outbound
+zakopd outbounds latency
+zakopd outbounds latency my_outbound
 ```
 
 The first successful URLTest pass warms DNS and protocol state and is discarded;
@@ -70,9 +70,9 @@ test does not create an `auto`/`urltest` routing outbound or change rule routing
 ## Priority Pools
 
 `config outbound_pool` groups at least two concrete outbounds in strict priority
-order. Pools are managed on the Outbounds page and appear anywhere neto offers
+order. Pools are managed on the Outbounds page and appear anywhere zakop offers
 an outbound selector: rules, proxy clients, simple mode, proxy DNS, provider and
-subscription updates, and the neto updater.
+subscription updates, and the zakop updater.
 
 ```uci
 config outbound_pool 'main_pool'
@@ -83,7 +83,7 @@ config outbound_pool 'main_pool'
 	option check_interval '60'
 ```
 
-The list order is the priority order. netod checks `primary` first and stops at
+The list order is the priority order. zakopd checks `primary` first and stops at
 the first successful sing-box delay probe. It selects that member through the
 localhost-only sing-box Clash API. If `primary` recovers, the next check returns
 the pool to it. This is deterministic failover, not URLTest lowest-latency load
@@ -100,7 +100,7 @@ Pool constraints:
 - the management controller defaults to `127.0.0.1:19090` and never adds
   router-self nft/TProxy routing.
 
-If every member is unavailable, netod keeps the last selector value and retries
+If every member is unavailable, zakopd keeps the last selector value and retries
 with a short bounded backoff until one member works. Temporary proxy operations
 (subscription/provider/self updates) do not use the running selector: they try
 the pool members directly and sequentially in priority order.
@@ -145,7 +145,7 @@ custom outbound. LuCI does not expose an empty or `Auto` selection.
 
 ## Imports
 
-`netod import-uri` импортирует share links и создает обычные `config outbound`
+`zakopd import-uri` импортирует share links и создает обычные `config outbound`
 sections.
 
 Supported schemes:
@@ -159,12 +159,12 @@ Supported schemes:
 Manual import:
 
 ```sh
-cat >/tmp/neto-import.txt <<'EOF'
+cat >/tmp/zakop-import.txt <<'EOF'
 vless://UUID@example.com:443?security=reality&sni=example.com&pbk=PUBLIC_KEY&sid=SHORT_ID#My%20VLESS
 EOF
 
-netod import-uri -file /tmp/neto-import.txt
-/etc/init.d/neto restart
+zakopd import-uri -file /tmp/zakop-import.txt
+/etc/init.d/zakop restart
 ```
 
 Imported nodes:
@@ -192,19 +192,19 @@ config subscription 'my_sub'
 Manual update:
 
 ```sh
-netod subscriptions update my_sub
-/etc/init.d/neto restart
+zakopd subscriptions update my_sub
+/etc/init.d/zakop restart
 ```
 
 Omit the name in the CLI to update every enabled subscription:
 
 ```sh
-netod subscriptions update
+zakopd subscriptions update
 ```
 
 The LuCI subscriptions section exposes `Update all`, but intentionally sends
 one named update request at a time to stay below the LuCI XHR timeout. It shows
-progress, continues after individual failures, and restarts neto once after the
+progress, continues after individual failures, and restarts zakop once after the
 full sequence.
 
 Subscription nodes are ordinary outbound sections:

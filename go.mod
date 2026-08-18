@@ -1,4 +1,3 @@
-module github.com/elllkere/neto
+module github.com/elllkere/zakop
 
 go 1.22
-

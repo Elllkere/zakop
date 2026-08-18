@@ -1,15 +1,15 @@
 #!/bin/sh
 
-bin="${1:-/usr/libexec/neto/sing-box}"
-config="${2:-/tmp/neto/sing-box.json}"
-netod_bin="${NETO_NETOD:-/usr/bin/netod}"
-log_file="${NETO_SINGBOX_LOG:-/tmp/neto/sing-box.log}"
-log_max_bytes="${NETO_SINGBOX_LOG_MAX_BYTES:-524288}"
-log_keep_bytes="${NETO_SINGBOX_LOG_KEEP_BYTES:-262144}"
-health_grace="${NETO_DNS_HEALTH_GRACE_SECONDS:-30}"
-health_interval="${NETO_DNS_HEALTH_INTERVAL_SECONDS:-10}"
-health_failures_max="${NETO_DNS_HEALTH_FAILURES:-3}"
-health_timeout="${NETO_DNS_HEALTH_TIMEOUT_SECONDS:-3}"
+bin="${1:-/usr/libexec/zakop/sing-box}"
+config="${2:-/tmp/zakop/sing-box.json}"
+zakopd_bin="${ZAKOP_ZAKOPD:-/usr/bin/zakopd}"
+log_file="${ZAKOP_SINGBOX_LOG:-/tmp/zakop/sing-box.log}"
+log_max_bytes="${ZAKOP_SINGBOX_LOG_MAX_BYTES:-524288}"
+log_keep_bytes="${ZAKOP_SINGBOX_LOG_KEEP_BYTES:-262144}"
+health_grace="${ZAKOP_DNS_HEALTH_GRACE_SECONDS:-30}"
+health_interval="${ZAKOP_DNS_HEALTH_INTERVAL_SECONDS:-10}"
+health_failures_max="${ZAKOP_DNS_HEALTH_FAILURES:-3}"
+health_timeout="${ZAKOP_DNS_HEALTH_TIMEOUT_SECONDS:-3}"
 log_dir="${log_file%/*}"
 child_pid=""
 log_enabled=0
@@ -58,7 +58,7 @@ positive_number "$health_timeout" || health_timeout=3
 
 log_message() {
 	[ "$log_enabled" -eq 1 ] || return 0
-	printf "%s neto: %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$log_file"
+	printf "%s zakop: %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$log_file"
 }
 
 start_singbox() {
@@ -120,7 +120,7 @@ while :; do
 	health_failures=0
 	restart_for_health=0
 	while child_running; do
-		if "$netod_bin" ready -timeout "${health_timeout}s" >/dev/null 2>&1; then
+		if "$zakopd_bin" ready -timeout "${health_timeout}s" >/dev/null 2>&1; then
 			health_failures=0
 		else
 			health_failures=$((health_failures + 1))

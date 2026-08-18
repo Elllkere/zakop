@@ -7,20 +7,20 @@ import (
 )
 
 func TestProvidersLuCIUsesProviderSections(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/providers.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/providers.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
 		"form.GridSection, 'provider'",
-		"uci.unset('neto', sid, 'enabled')",
+		"uci.unset('zakop', sid, 'enabled')",
 		"form.Value, 'label'",
 		"form.ListValue, 'type'",
 		"form.ListValue, 'source'",
 		"form.Value, 'url'",
 		"form.Value, 'script_path'",
-		"NETO_PROVIDER_OUTPUT",
+		"ZAKOP_PROVIDER_OUTPUT",
 		"form.Flag, 'auto_update'",
 		"form.ListValue, 'update_schedule'",
 		"form.ListValue, 'update_hour'",
@@ -44,23 +44,23 @@ func TestProvidersLuCIUsesProviderSections(t *testing.T) {
 		"referencedProviders(section_id)",
 		"handleSaveCommitConfig: function()",
 		"return this.handleSaveCommitConfig()",
-		"fs.exec('/sbin/uci', [ 'commit', 'neto' ])",
+		"fs.exec('/sbin/uci', [ 'commit', 'zakop' ])",
 		"throw new Error(res.stderr || res.stdout || _('Commit failed'))",
 		"domain_provider",
 		"ip_provider",
 		"Rule \"%s\" references missing provider \"%s\"",
 		"form.Button, '_update'",
 		"function(ev, section_id)",
-		"NETO_PROVIDER_PROXY",
-		"fs.exec('/usr/bin/netod', [ 'providers', 'update', section_id ])",
+		"ZAKOP_PROVIDER_PROXY",
+		"fs.exec('/usr/bin/zakopd', [ 'providers', 'update', section_id ])",
 		"handleProviderUpdateAll: function()",
 		"runProviderUpdates: function(names)",
 		"setProviderUpdateAllButton: function(running, current, total)",
-		"fs.exec('/usr/bin/netod', [ 'providers', 'update', name ])",
+		"fs.exec('/usr/bin/zakopd', [ 'providers', 'update', name ])",
 		"failures.push({ name: name, error:",
 		"showProviderUpdateFailures: function(failures)",
 		"Updating %d/%d…",
-		"'data-neto-providers-update-all': '1'",
+		"'data-zakop-providers-update-all': '1'",
 		"_('Updating all…')",
 		"_('Update all')",
 		"handleImportProviderPresets: function()",
@@ -82,7 +82,7 @@ func TestProvidersLuCIUsesProviderSections(t *testing.T) {
 		"uci.commit(",
 		"form.Flag, 'enabled'",
 		"missing or disabled provider",
-		"fs.exec('/usr/bin/netod', [ 'providers', 'update' ])",
+		"fs.exec('/usr/bin/zakopd', [ 'providers', 'update' ])",
 	} {
 		if strings.Contains(s, forbidden) {
 			t.Fatalf("providers.js must not contain policy field %q:\n%s", forbidden, s)
@@ -99,7 +99,7 @@ func TestProvidersLuCIUsesProviderSections(t *testing.T) {
 }
 
 func TestProvidersLuCIImportsProviderPresets(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/providers.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/providers.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,41 +137,41 @@ func TestProvidersLuCIImportsProviderPresets(t *testing.T) {
 		"https://raw.githubusercontent.com/itdoginfo/allow-domains/refs/heads/main/Categories/anime.lst",
 		"https://www.cloudflare.com/ips-v4/",
 		"https://core.telegram.org/resources/cidr.txt",
-		"/usr/share/neto/providers/akamai-ipv4.sh",
-		"/usr/share/neto/providers/aws-ipv4.sh",
-		"/usr/share/neto/providers/aws-full-ipv4.sh",
-		"/usr/share/neto/providers/aws-full-eu-ipv4.sh",
-		"/usr/share/neto/providers/google-cloud-eu-ipv4.sh",
+		"/usr/share/zakop/providers/akamai-ipv4.sh",
+		"/usr/share/zakop/providers/aws-ipv4.sh",
+		"/usr/share/zakop/providers/aws-full-ipv4.sh",
+		"/usr/share/zakop/providers/aws-full-eu-ipv4.sh",
+		"/usr/share/zakop/providers/google-cloud-eu-ipv4.sh",
 		"providerURLExists(def.url)",
 		"providerScriptExists(def.script_path)",
 		"uniqueProviderSection(def.section)",
 		"function addProviderPreset(def)",
-		"uci.add('neto', 'provider', section)",
-		"uci.set('neto', section, 'type', def.type || 'domain')",
-		"uci.set('neto', section, 'source', source)",
-		"uci.set('neto', section, 'script_path', def.script_path)",
-		"uci.set('neto', section, 'auto_update', '0')",
-		"uci.set('neto', section, 'update_minute', def.update_minute || '5')",
+		"uci.add('zakop', 'provider', section)",
+		"uci.set('zakop', section, 'type', def.type || 'domain')",
+		"uci.set('zakop', section, 'source', source)",
+		"uci.set('zakop', section, 'script_path', def.script_path)",
+		"uci.set('zakop', section, 'auto_update', '0')",
+		"uci.set('zakop', section, 'update_minute', def.update_minute || '5')",
 		"return this.map.save(normalizeProviders)",
 		"for (var j = 0; j < builtinIPProviders.length; j++)",
-		"return uci.save('neto')",
+		"return uci.save('zakop')",
 		"throw new Error(_('Save failed'))",
-		"return fs.exec('/sbin/uci', [ 'commit', 'neto' ])",
+		"return fs.exec('/sbin/uci', [ 'commit', 'zakop' ])",
 		"return self.handleImportProviderPresets().catch(function(err) {",
-		"fs.exec('/etc/init.d/neto', [ 'restart' ])",
+		"fs.exec('/etc/init.d/zakop', [ 'restart' ])",
 		"Provider presets already exist",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("providers.js missing community provider preset %q:\n%s", want, s)
 		}
 	}
-	if strings.Contains(s, "uci.set('neto', section, 'enabled'") {
+	if strings.Contains(s, "uci.set('zakop', section, 'enabled'") {
 		t.Fatalf("community provider presets must not write enabled:\n%s", s)
 	}
 }
 
 func TestProvidersLuCIShowsUpdatedInTable(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/providers.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/providers.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestProvidersLuCIShowsUpdatedInTable(t *testing.T) {
 }
 
 func TestProvidersLuCIUpdateButtonIsModalOnly(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/providers.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/providers.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestProvidersLuCIUpdateButtonIsModalOnly(t *testing.T) {
 }
 
 func TestProvidersLuCITableEditsOnlyAutoUpdateFlag(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/providers.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/providers.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestProvidersLuCITableEditsOnlyAutoUpdateFlag(t *testing.T) {
 		for _, forbidden := range []string{
 			"plain text provider list",
 			"custom filtering",
-			"NETO_PROVIDER_PROXY",
+			"ZAKOP_PROVIDER_PROXY",
 		} {
 			if strings.Contains(block, forbidden) {
 				t.Fatalf("provider table field %q should not contain help text %q:\n%s", needle, forbidden, block)
@@ -277,7 +277,7 @@ func TestProvidersLuCITableEditsOnlyAutoUpdateFlag(t *testing.T) {
 }
 
 func TestProvidersLuCIURLOnlyAppliesToURLSource(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/providers.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/providers.js")
 	if err != nil {
 		t.Fatal(err)
 	}

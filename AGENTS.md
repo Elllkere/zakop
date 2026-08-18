@@ -1,11 +1,11 @@
-# neto Agent Handoff
+# zakop Agent Handoff
 
-This repository contains `neto`, an embedded-first OpenWrt/ImmortalWrt service.
+This repository contains `zakop`, an embedded-first OpenWrt/ImmortalWrt service.
 Future Codex sessions should read this file before making changes.
 
 ## Project Goal
 
-`neto` is a pre-sing-box policy router for OpenWrt/ImmortalWrt. Routing
+`zakop` is a pre-sing-box policy router for OpenWrt/ImmortalWrt. Routing
 decisions must happen before traffic enters sing-box. Traffic that should be
 direct/bypassed must never enter sing-box.
 
@@ -15,7 +15,7 @@ sing-box is used only as:
 - TProxy inbound backend.
 - Proxy outbound executor.
 
-`netod` must not become a transparent TCP/UDP proxy.
+`zakopd` must not become a transparent TCP/UDP proxy.
 
 ## Supported Targets
 
@@ -32,38 +32,38 @@ The project is embedded-first. Users should install without manually choosing
 CPU architecture or binaries:
 
 ```sh
-sh -c "$(wget -O- https://raw.githubusercontent.com/elllkere/neto/main/embedded/install.sh)"
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/elllkere/neto/main/embedded/install.sh)"
+sh -c "$(wget -O- https://raw.githubusercontent.com/elllkere/zakop/main/embedded/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/elllkere/zakop/main/embedded/install.sh)"
 ```
 
-The embedded archive is `dist/neto-openwrt-embedded.tar.gz` and should contain a
-top-level `neto/` directory.
+The embedded archive is `dist/zakop-openwrt-embedded.tar.gz` and should contain a
+top-level `zakop/` directory.
 
 ## Runtime Paths
 
-- `/etc/config/neto`
-- `/etc/init.d/neto`
-- `/usr/bin/netod`
-- `/usr/libexec/neto/sing-box`
-- `/usr/share/neto/`
-- `/etc/neto/provider-cache/`
-- `/tmp/neto/neto.nft`
-- `/tmp/neto/sing-box.json`
-- `/tmp/neto/sing-box.log`
-- `/var/lib/neto/`
+- `/etc/config/zakop`
+- `/etc/init.d/zakop`
+- `/usr/bin/zakopd`
+- `/usr/libexec/zakop/sing-box`
+- `/usr/share/zakop/`
+- `/etc/zakop/provider-cache/`
+- `/tmp/zakop/zakop.nft`
+- `/tmp/zakop/sing-box.json`
+- `/tmp/zakop/sing-box.log`
+- `/var/lib/zakop/`
 
 ## Critical Invariants
 
-- neto routes before sing-box.
+- zakop routes before sing-box.
 - nftables decides packet routing before sing-box.
 - direct/bypass traffic must never enter sing-box.
 - sing-box owns FakeIP and the FakeIP domain mapping.
 - sing-box stdout/stderr must not be forwarded to OpenWrt system log. The init
-  script runs sing-box through `/usr/share/neto/run-sing-box-log.sh`, which
-  writes volatile `/tmp/neto/sing-box.log` for the LuCI Logs page to avoid
+  script runs sing-box through `/usr/share/zakop/run-sing-box-log.sh`, which
+  writes volatile `/tmp/zakop/sing-box.log` for the LuCI Logs page to avoid
   persistent flash/overlay writes.
-- netod must not proxy transparent TCP/UDP traffic.
-- neto must only route LAN client traffic.
+- zakopd must not proxy transparent TCP/UDP traffic.
+- zakop must only route LAN client traffic.
 - WAN, inbound, router self, and non-LAN prerouting traffic must return.
 - DNAT-associated connections, including port-forward replies from LAN servers,
   must return before client proxy policy.
@@ -82,7 +82,7 @@ top-level `neto/` directory.
 Client policies:
 
 - absent/default: follow general `routing_mode`.
-- `proxy`: force non-reserved TCP/UDP from this client through neto.
+- `proxy`: force non-reserved TCP/UDP from this client through zakop.
   `option outbound` selects a custom sing-box outbound for this client; a
   missing legacy value is normalized to the first custom outbound.
 - `direct`: hard bypass. Real DNS only, no FakeIP, nft return before proxy rules.
@@ -98,8 +98,8 @@ Routing modes:
 
 ## Current DNS Model
 
-- `dns_listen` is the local netod DNS server/listener used by dnsmasq.
-- netod is a DNS policy forwarder only. It must not implement normal-path DoH,
+- `dns_listen` is the local zakopd DNS server/listener used by dnsmasq.
+- zakopd is a DNS policy forwarder only. It must not implement normal-path DoH,
   DoT, or DoQ transport clients.
 - sing-box handles DNS transport through three local DNS listeners:
   `singbox_dns_fakeip` (`127.0.0.1:15353`),
@@ -122,8 +122,8 @@ Routing modes:
   non-LAN source must always use real DNS and must not receive FakeIP. Router
   self traffic is excluded from nft/TProxy policy, so returning FakeIP to the
   router would make matched destinations unreachable.
-- dnsmasq `addsubnet=32` is used only as local metadata so netod can recover
-  the original LAN client IP. netod must strip EDNS Client Subnet before
+- dnsmasq `addsubnet=32` is used only as local metadata so zakopd can recover
+  the original LAN client IP. zakopd must strip EDNS Client Subnet before
   forwarding DNS queries to sing-box/public resolvers.
 - When `manage_dnsmasq=1`, nftables redirects plain IPv4 LAN TCP/UDP port 53
   traffic to the router dnsmasq. This keeps DNS from clients behind a bridge/AP
@@ -194,40 +194,40 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
 - Provider types are `domain` and `ip`.
 - Provider source is `url` by default. URL providers download plain text lists
   from `url` into
-  `/etc/neto/provider-cache/`. Do not use `/var/lib/neto/providers/` as the
+  `/etc/zakop/provider-cache/`. Do not use `/var/lib/zakop/providers/` as the
   default cache location because OpenWrt `/var` may be volatile.
 - Provider source may be `script`. Script providers keep `type=domain|ip`,
   set `source=script`, and use an absolute `script_path`. The script returns
   one domain/IP/CIDR per line either on stdout or by writing the final result to
-  the temp file path in `NETO_PROVIDER_OUTPUT`; netod reads that file only after
-  the script exits. netod still normalizes, filters IPv4 for IP providers,
+  the temp file path in `ZAKOP_PROVIDER_OUTPUT`; zakopd reads that file only after
+  the script exits. zakopd still normalizes, filters IPv4 for IP providers,
   writes the standard cache, and updates metadata. Scripts may use
-  `NETO_PROVIDER_*` environment variables; with `update_via=proxy`, netod starts
+  `ZAKOP_PROVIDER_*` environment variables; with `update_via=proxy`, zakopd starts
   the temporary update proxy and exports `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`.
-- Legacy `local_path` values under `/var/lib/neto/providers/` are treated as
-  default provider cache paths and resolved to `/etc/neto/provider-cache/`.
-- Missing provider caches must not abort compile/startup. neto should warn and
-  compile that provider reference as empty until `netod providers update [name]`
+- Legacy `local_path` values under `/var/lib/zakop/providers/` are treated as
+  default provider cache paths and resolved to `/etc/zakop/provider-cache/`.
+- Missing provider caches must not abort compile/startup. zakop should warn and
+  compile that provider reference as empty until `zakopd providers update [name]`
   succeeds.
-- `netod providers update [name]` updates URL providers using `curl` and script
+- `zakopd providers update [name]` updates URL providers using `curl` and script
   providers by executing `script_path`.
 - LuCI Providers exposes `Update all`, which saves UCI and runs one named
-  `netod providers update <name>` request at a time to avoid LuCI XHR timeouts.
-  A failed provider is reported but must not stop later providers; restart neto
+  `zakopd providers update <name>` request at a time to avoid LuCI XHR timeouts.
+  A failed provider is reported but must not stop later providers; restart zakop
   once after the entire sequence.
 - LuCI Providers page can import built-in IP provider presets for Cloudflare
   (`https://www.cloudflare.com/ips-v4/`), Telegram
   (`https://core.telegram.org/resources/cidr.txt`), Akamai
-  (`/usr/share/neto/providers/akamai-ipv4.sh`), AWS CDN
-  (`/usr/share/neto/providers/aws-ipv4.sh`), AWS Full
-  (`/usr/share/neto/providers/aws-full-ipv4.sh`), and AWS Full EU
-  (`/usr/share/neto/providers/aws-full-eu-ipv4.sh`), and Google Cloud Europe
-  (`/usr/share/neto/providers/google-cloud-eu-ipv4.sh`). Installer must not create
+  (`/usr/share/zakop/providers/akamai-ipv4.sh`), AWS CDN
+  (`/usr/share/zakop/providers/aws-ipv4.sh`), AWS Full
+  (`/usr/share/zakop/providers/aws-full-ipv4.sh`), and AWS Full EU
+  (`/usr/share/zakop/providers/aws-full-eu-ipv4.sh`), and Google Cloud Europe
+  (`/usr/share/zakop/providers/google-cloud-eu-ipv4.sh`). Installer must not create
   these provider sections automatically. Presets are convenience data sources
   only: they must be created with `auto_update=0` and no rules.
 - IP provider updates save only valid IPv4 CIDR/address entries; IPv6 entries
   from mixed feeds such as Telegram are ignored.
-- `auto_update=1` creates neto-owned cron entries, similar to protocol
+- `auto_update=1` creates zakop-owned cron entries, similar to protocol
   subscriptions. Fixed-time scheduling uses `update_schedule=time`.
   Providers support `update_hour` and `update_minute`; missing
   `update_minute` defaults to `5` for backward-compatible cron timing.
@@ -255,7 +255,7 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
   type, address, port, and a read-only URLTest delay column. Do not add a second
   editable name/input column. Protocol details belong in the edit modal.
 - Outbounds LuCI exposes a latency test. It invokes one named
-  `netod outbounds latency <tag>` request at a time to avoid LuCI XHR timeouts,
+  `zakopd outbounds latency <tag>` request at a time to avoid LuCI XHR timeouts,
   continues after an individual failure, and updates row results incrementally.
   The backend uses the native sing-box Clash API URLTest delay endpoint through
   a localhost-only temporary controller, without adding an automatic selector
@@ -278,13 +278,13 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
 - `config outbound_pool` provides strict-priority failover across two or more
   unique concrete custom outbounds. Pool tags share the selectable namespace
   with outbound tags, nested pools are not supported, and list order is
-  priority order. Pools are generated as sing-box selectors; netod uses the
+  priority order. Pools are generated as sing-box selectors; zakopd uses the
   localhost-only Clash API to choose the first healthy member and return to a
   recovered higher-priority member. Pools are selectable everywhere a custom
   outbound is selected, including temporary update paths, which retry concrete
   pool members sequentially.
-- Startup must not enable nft/TProxy policy or point dnsmasq at netod until an
-  end-to-end query through netod and the selected sing-box real-DNS listener
+- Startup must not enable nft/TProxy policy or point dnsmasq at zakopd until an
+  end-to-end query through zakopd and the selected sing-box real-DNS listener
   succeeds.
 - Do not implement `reload_service()` by calling `start_service()` directly.
   Network/config reloads must use rc.common's procd-aware start wrapper so the
@@ -306,23 +306,23 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
   `update_interval_minutes`, `update_via`, and `update_outbound`.
 - Supported import URI schemes are `vless://`, `hysteria2://`/`hy2://`,
   `ss://`, and `trojan://`.
-- `netod import-uri -file <path>` imports one or more share links from a local
+- `zakopd import-uri -file <path>` imports one or more share links from a local
   file.
-- `netod subscriptions update [name]` downloads subscriptions and replaces only
+- `zakopd subscriptions update [name]` downloads subscriptions and replaces only
   nodes belonging to that subscription.
 - The Outbounds subscriptions section exposes `Update all`, which saves UCI and
-  runs one named `netod subscriptions update <name>` request at a time to avoid
+  runs one named `zakopd subscriptions update <name>` request at a time to avoid
   LuCI XHR timeouts. A failed subscription must not stop later subscriptions;
-  restart neto once after the entire sequence.
+  restart zakop once after the entire sequence.
 - Subscription downloads use the system `curl` binary, not Go `net/http`, to
-  keep embedded multi-architecture `netod` binaries small.
-- `auto_update=1` is implemented by neto-owned cron entries in
+  keep embedded multi-architecture `zakopd` binaries small.
+- `auto_update=1` is implemented by zakop-owned cron entries in
   `/etc/crontabs/root`; preserve user cron lines and only rewrite the marked
-  neto block.
+  zakop block.
 - `update_via=direct` uses direct curl fetching. `update_via=proxy` uses a
   temporary sing-box mixed inbound and a selected custom outbound; it must not
   route router-self traffic through nftables.
-- The neto self-updater uses `config main` options `update_via=direct|proxy`
+- The zakop self-updater uses `config main` options `update_via=direct|proxy`
   and `update_outbound`. Proxy mode downloads the version marker, installer,
   and release archive through the same temporary sing-box mixed-proxy model;
   it must not add router-self nft/TProxy rules.
@@ -335,7 +335,7 @@ OpenWrt/ImmortalWrt LuCI instance.
 ## Forbidden Changes
 
 - Do not add IPv6 routing in v1.
-- Do not implement a transparent TCP/UDP proxy in netod.
+- Do not implement a transparent TCP/UDP proxy in zakopd.
 - Do not implement a custom FakeIP allocator in v1.
 - Do not add fw3/iptables support.
 - Do not route WAN/inbound/non-LAN prerouting traffic.
@@ -348,11 +348,11 @@ OpenWrt/ImmortalWrt LuCI instance.
 
 ```sh
 go test ./...
-sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/neto/*.sh embedded/files/usr/share/neto/providers/*.sh
-sh -n embedded/files/usr/share/neto/providers/*.sh
+sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/zakop/*.sh embedded/files/usr/share/zakop/providers/*.sh
+sh -n embedded/files/usr/share/zakop/providers/*.sh
 jq empty embedded/files/usr/share/luci/menu.d/*.json
 jq empty embedded/files/usr/share/rpcd/acl.d/*.json
-node --check embedded/files/www/luci-static/resources/view/neto/*.js
+node --check embedded/files/www/luci-static/resources/view/zakop/*.js
 ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```
@@ -360,14 +360,14 @@ node --check embedded/files/www/luci-static/resources/view/neto/*.js
 If Go cache under `$HOME` is read-only in the sandbox, use:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache go test ./...
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache go test ./...
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ```
 
 ## Documentation Lookup
 
 When changing LuCI JavaScript under
-`embedded/files/www/luci-static/resources/view/neto/`, query the current
+`embedded/files/www/luci-static/resources/view/zakop/`, query the current
 OpenWrt LuCI documentation with Context7 before relying on `form` or `uci` API
 details. Verify names and behavior for `form.Map`, sections, option flags,
 save hooks, and `uci.sections`/`uci.set` persistence.
@@ -378,6 +378,6 @@ After making repository changes, rebuild the embedded distribution archive and
 validate it:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func TestGenerateUsesModernFakeIPServer(t *testing.T) {
@@ -505,7 +505,7 @@ func TestGenerateVLESSAdvancedTLSAndTransport(t *testing.T) {
 		TLSCipherSuites:   []string{"TLS_AES_128_GCM_SHA256"},
 		ECH:               true,
 		ECHConfig:         []string{"ech-config"},
-		ECHConfigPath:     "/etc/neto/ech.pem",
+		ECHConfigPath:     "/etc/zakop/ech.pem",
 		UTLSFingerprint:   "chrome",
 		Reality:           true,
 		RealityPublicKey:  "public-key",
@@ -527,7 +527,7 @@ func TestGenerateVLESSAdvancedTLSAndTransport(t *testing.T) {
 	if tls["utls"].(map[string]any)["fingerprint"] != "chrome" {
 		t.Fatalf("missing uTLS: %+v", tls)
 	}
-	if tls["ech"].(map[string]any)["config_path"] != "/etc/neto/ech.pem" {
+	if tls["ech"].(map[string]any)["config_path"] != "/etc/zakop/ech.pem" {
 		t.Fatalf("missing ECH: %+v", tls)
 	}
 	ciphers := tls["cipher_suites"].([]any)

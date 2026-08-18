@@ -1,6 +1,6 @@
 # Managed binary slots
 
-`embedded/pack.sh` кладет `netod` binaries в arch directories:
+`embedded/pack.sh` кладет `zakopd` binaries в arch directories:
 
 - `linux-amd64/`
 - `linux-arm64/`
@@ -12,7 +12,7 @@ Managed `sing-box` binaries можно положить в эти же directori
 Они попадут в embedded archive и будут установлены в:
 
 ```text
-/usr/libexec/neto/sing-box
+/usr/libexec/zakop/sing-box
 ```
 
 Managed `sing-box` используется только если system `sing-box` отсутствует или

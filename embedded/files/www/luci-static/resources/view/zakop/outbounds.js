@@ -4,11 +4,11 @@
 'require ui';
 'require uci';
 'require view';
-'require neto.i18n as netoI18n';
-'require neto.ui as netoUI';
+'require zakop.i18n as zakopI18n';
+'require zakop.ui as zakopUI';
 
-var importPath = '/tmp/neto-import.txt';
-var _ = netoI18n.translate;
+var importPath = '/tmp/zakop-import.txt';
+var _ = zakopI18n.translate;
 
 function isReservedTag(tag) {
 	return tag == 'direct' || tag == 'blocked' || tag == 'block' || tag == 'proxy_default';
@@ -43,7 +43,7 @@ function dependsTransport(option, transport) {
 function addProxyOutboundChoices(option) {
 	var first = '';
 
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 		var label = String(section.label || section.name || tag).trim();
 
@@ -54,7 +54,7 @@ function addProxyOutboundChoices(option) {
 			first = tag;
 		option.value(tag, label || tag);
 	});
-	uci.sections('neto', 'outbound_pool', function(section, sid) {
+	uci.sections('zakop', 'outbound_pool', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 		var label = String(section.label || section.name || tag).trim();
 
@@ -81,13 +81,13 @@ function outboundTagExists(tag) {
 	var found = false;
 
 	tag = String(tag || '').trim();
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var existing = String(section.tag || sid || section['.name'] || '').trim();
 
 		if (existing == tag)
 			found = true;
 	});
-	uci.sections('neto', 'outbound_pool', function(section, sid) {
+	uci.sections('zakop', 'outbound_pool', function(section, sid) {
 		var existing = String(section.tag || sid || section['.name'] || '').trim();
 
 		if (existing == tag)
@@ -101,7 +101,7 @@ function concreteOutboundTagExists(tag) {
 	var found = false;
 
 	tag = String(tag || '').trim();
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var existing = String(section.tag || sid || section['.name'] || '').trim();
 
 		if (existing == tag && !isReservedTag(existing))
@@ -114,7 +114,7 @@ function concreteOutboundTagExists(tag) {
 function outboundDisplayLabels() {
 	var labels = {};
 
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 		var label = String(section.label || section.name || tag).trim();
 
@@ -126,7 +126,7 @@ function outboundDisplayLabels() {
 }
 
 function poolPriorityText(section_id) {
-	var members = L.toArray(uci.get('neto', section_id, 'outbound'));
+	var members = L.toArray(uci.get('zakop', section_id, 'outbound'));
 	var labels = outboundDisplayLabels();
 	var full = [];
 	var content = [];
@@ -153,7 +153,7 @@ function poolPriorityText(section_id) {
 }
 
 function outboundTag(section_id) {
-	return String(uci.get('neto', section_id, 'tag') || section_id || '').trim();
+	return String(uci.get('zakop', section_id, 'tag') || section_id || '').trim();
 }
 
 function addNamedSectionValidator(el, section, reservedMessage, checkOutboundTags) {
@@ -190,46 +190,46 @@ function addNamedSectionValidator(el, section, reservedMessage, checkOutboundTag
 }
 
 function normalizeOutbounds() {
-	uci.sections('neto', 'outbound', function(section, sid) {
-		var tag = String(uci.get('neto', sid, 'tag') || '').trim();
-		var label = String(uci.get('neto', sid, 'label') || uci.get('neto', sid, 'name') || '').trim();
+	uci.sections('zakop', 'outbound', function(section, sid) {
+		var tag = String(uci.get('zakop', sid, 'tag') || '').trim();
+		var label = String(uci.get('zakop', sid, 'label') || uci.get('zakop', sid, 'name') || '').trim();
 
 		if (sid == 'proxy_default' || tag == 'proxy_default')
 			return;
 
 		if (tag == '')
-			uci.set('neto', sid, 'tag', sid);
+			uci.set('zakop', sid, 'tag', sid);
 
 		if (label == '')
-			uci.set('neto', sid, 'label', sid);
+			uci.set('zakop', sid, 'label', sid);
 
-		if (uci.get('neto', sid, 'type') == null)
-			uci.set('neto', sid, 'type', 'vless');
+		if (uci.get('zakop', sid, 'type') == null)
+			uci.set('zakop', sid, 'type', 'vless');
 	});
 }
 
 function normalizeSubscriptions() {
-	uci.sections('neto', 'subscription', function(section, sid) {
-		if (uci.get('neto', sid, 'enabled') == null)
-			uci.set('neto', sid, 'enabled', '1');
+	uci.sections('zakop', 'subscription', function(section, sid) {
+		if (uci.get('zakop', sid, 'enabled') == null)
+			uci.set('zakop', sid, 'enabled', '1');
 
-		if (uci.get('neto', sid, 'label') == null)
-			uci.set('neto', sid, 'label', sid);
+		if (uci.get('zakop', sid, 'label') == null)
+			uci.set('zakop', sid, 'label', sid);
 
-		if (uci.get('neto', sid, 'auto_update') == null)
-			uci.set('neto', sid, 'auto_update', '0');
+		if (uci.get('zakop', sid, 'auto_update') == null)
+			uci.set('zakop', sid, 'auto_update', '0');
 
-		if (uci.get('neto', sid, 'update_schedule') == null)
-			uci.set('neto', sid, 'update_schedule', 'time');
+		if (uci.get('zakop', sid, 'update_schedule') == null)
+			uci.set('zakop', sid, 'update_schedule', 'time');
 
-		if (uci.get('neto', sid, 'update_hour') == null)
-			uci.set('neto', sid, 'update_hour', '0');
+		if (uci.get('zakop', sid, 'update_hour') == null)
+			uci.set('zakop', sid, 'update_hour', '0');
 
-		if (uci.get('neto', sid, 'update_interval_minutes') == null)
-			uci.set('neto', sid, 'update_interval_minutes', '360');
+		if (uci.get('zakop', sid, 'update_interval_minutes') == null)
+			uci.set('zakop', sid, 'update_interval_minutes', '360');
 
-		if (uci.get('neto', sid, 'update_via') == null)
-			uci.set('neto', sid, 'update_via', 'direct');
+		if (uci.get('zakop', sid, 'update_via') == null)
+			uci.set('zakop', sid, 'update_via', 'direct');
 	});
 }
 
@@ -240,8 +240,8 @@ function normalizeAll() {
 
 return view.extend({
 	load: function() {
-		return uci.load('neto').then(function() {
-			netoUI.syncRulesTab();
+		return uci.load('zakop').then(function() {
+			zakopUI.syncRulesTab();
 		});
 	},
 
@@ -254,14 +254,14 @@ return view.extend({
 	handleSaveCommitConfig: function() {
 		return this.handleSave()
 			.then(function() {
-				return fs.exec('/sbin/uci', [ 'commit', 'neto' ]);
+				return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Commit failed'));
 
-				uci.unload('neto');
-				return uci.load('neto').then(function() {
+				uci.unload('zakop');
+				return uci.load('zakop').then(function() {
 					return ui.changes.init();
 				});
 			});
@@ -270,7 +270,7 @@ return view.extend({
 	handleSaveApply: function(ev) {
 		return this.handleSave(ev)
 			.then(function() {
-				return netoUI.applyAndRestart();
+				return zakopUI.applyAndRestart();
 			});
 	},
 
@@ -340,13 +340,13 @@ return view.extend({
 
 		return fs.write(importPath, value + '\n', 384)
 			.then(function() {
-				return fs.exec('/usr/bin/netod', [ 'import-uri', '-file', importPath ]);
+				return fs.exec('/usr/bin/zakopd', [ 'import-uri', '-file', importPath ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Import failed'));
 
-				return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 			})
 			.then(function() {
 				window.location.reload();
@@ -356,13 +356,13 @@ return view.extend({
 	handleSubscriptionUpdate: function(section_id) {
 		return this.handleSaveCommitConfig()
 			.then(function() {
-				return fs.exec('/usr/bin/netod', [ 'subscriptions', 'update', section_id ]);
+				return fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update', section_id ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Update failed'));
 
-				return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 			})
 			.then(function() {
 				window.location.reload();
@@ -379,7 +379,7 @@ return view.extend({
 		return this.handleSaveCommitConfig()
 			.then(L.bind(function() {
 				names = [];
-				uci.sections('neto', 'subscription', function(section, sid) {
+				uci.sections('zakop', 'subscription', function(section, sid) {
 					if (String(section.enabled == null ? '1' : section.enabled) != '0')
 						names.push(String(section['.name'] || sid));
 				});
@@ -390,7 +390,7 @@ return view.extend({
 			}, this))
 			.then(function(updateFailures) {
 				failures = updateFailures;
-				return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 			})
 			.then(function(res) {
 				if (res.code)
@@ -409,7 +409,7 @@ return view.extend({
 		names.forEach(function(name, index) {
 			chain = chain.then(function() {
 				self.setSubscriptionUpdateAllButton(true, index + 1, names.length);
-				return fs.exec('/usr/bin/netod', [ 'subscriptions', 'update', name ])
+				return fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update', name ])
 					.then(function(res) {
 						if (res.code)
 							failures.push({ name: name, error: res.stderr || res.stdout || _('Update failed') });
@@ -423,7 +423,7 @@ return view.extend({
 	},
 
 	setSubscriptionUpdateAllButton: function(running, current, total) {
-		var buttons = document.querySelectorAll('[data-neto-subscriptions-update-all]');
+		var buttons = document.querySelectorAll('[data-zakop-subscriptions-update-all]');
 		var text = running && total ? _('Updating %d/%d…').format(current, total) : (running ? _('Updating all…') : _('Update all'));
 
 		for (var i = 0; i < buttons.length; i++) {
@@ -451,7 +451,7 @@ return view.extend({
 		return this.handleSaveCommitConfig()
 			.then(L.bind(function() {
 				targets = [];
-				uci.sections('neto', 'outbound', function(section, sid) {
+				uci.sections('zakop', 'outbound', function(section, sid) {
 					var tag = String(section.tag || section['.name'] || sid || '').trim();
 					if (tag == '' || isReservedTag(tag))
 						return;
@@ -485,7 +485,7 @@ return view.extend({
 				self.setOutboundLatencyButton(true, index + 1, targets.length);
 				self.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag);
 
-				return fs.exec('/usr/bin/netod', [ 'outbounds', 'latency', target.tag ])
+				return fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency', target.tag ])
 					.then(function(res) {
 						var itemReport;
 
@@ -528,7 +528,7 @@ return view.extend({
 	},
 
 	setOutboundLatencyButton: function(testing, current, total) {
-		var buttons = document.querySelectorAll('[data-neto-latency-button]');
+		var buttons = document.querySelectorAll('[data-zakop-latency-button]');
 		var text = testing && total ? _('Testing %d/%d…').format(current, total) : (testing ? _('Testing…') : _('Test latency'));
 
 		for (var i = 0; i < buttons.length; i++) {
@@ -538,10 +538,10 @@ return view.extend({
 	},
 
 	setOutboundLatencyStatus: function(text, className, title, tag) {
-		var cells = document.querySelectorAll('[data-neto-latency-tag]');
+		var cells = document.querySelectorAll('[data-zakop-latency-tag]');
 
 		for (var i = 0; i < cells.length; i++) {
-			if (tag && cells[i].getAttribute('data-neto-latency-tag') != tag)
+			if (tag && cells[i].getAttribute('data-zakop-latency-tag') != tag)
 				continue;
 			cells[i].textContent = text;
 			cells[i].className = className || '';
@@ -553,7 +553,7 @@ return view.extend({
 		var results = Array.isArray(report && report.results) ? report.results : [];
 		var byTag = Object.create(null);
 		var best = null;
-		var cells = document.querySelectorAll('[data-neto-latency-tag]');
+		var cells = document.querySelectorAll('[data-zakop-latency-tag]');
 
 		for (var i = 0; i < results.length; i++) {
 			var result = results[i] || {};
@@ -568,7 +568,7 @@ return view.extend({
 
 		for (var j = 0; j < cells.length; j++) {
 			var cell = cells[j];
-			var cellResult = byTag[cell.getAttribute('data-neto-latency-tag')];
+			var cellResult = byTag[cell.getAttribute('data-zakop-latency-tag')];
 
 			if (!cellResult) {
 				cell.textContent = _('Not tested');
@@ -589,9 +589,9 @@ return view.extend({
 	render: function() {
 		var m, s, o, self, pool, sub;
 
-		netoUI.syncRulesTab();
+		zakopUI.syncRulesTab();
 
-		m = new form.Map('neto', _('neto'));
+		m = new form.Map('zakop', _('zakop'));
 		this.map = m;
 		self = this;
 
@@ -600,10 +600,10 @@ return view.extend({
 		s.addremove = true;
 		s.modaltitle = _('Outbound details');
 		s.sectiontitle = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		s.filter = function(section_id) {
-			var tag = String(uci.get('neto', section_id, 'tag') || section_id || '').trim();
+			var tag = String(uci.get('zakop', section_id, 'tag') || section_id || '').trim();
 			return tag != 'proxy_default';
 		};
 		s.renderSectionAdd = function() {
@@ -620,7 +620,7 @@ return view.extend({
 			latencyButton = E('button', {
 				'class': 'cbi-button cbi-button-action',
 				'style': 'margin-left:.5em',
-				'data-neto-latency-button': '1',
+				'data-zakop-latency-button': '1',
 				'disabled': self.latencyTesting ? true : null,
 				'click': function(ev) {
 					ev.preventDefault();
@@ -642,11 +642,11 @@ return view.extend({
 
 		o = s.option(form.Value, 'label', _('Name'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		o.write = function(section_id, formvalue) {
 			var label = String(formvalue || '').trim();
-			uci.set('neto', section_id, 'label', label || section_id);
+			uci.set('zakop', section_id, 'label', label || section_id);
 		};
 		o.validate = function(section_id, value) {
 			var label = String(value || section_id || '').trim();
@@ -669,10 +669,10 @@ return view.extend({
 
 		o = s.option(form.Value, 'server', _('Address'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'server') || uci.get('neto', section_id, 'address');
+			return uci.get('zakop', section_id, 'server') || uci.get('zakop', section_id, 'address');
 		};
 		o.write = function(section_id, formvalue) {
-			uci.set('neto', section_id, 'server', String(formvalue || '').trim());
+			uci.set('zakop', section_id, 'server', String(formvalue || '').trim());
 		};
 		o.datatype = 'host';
 		o.rmempty = false;
@@ -684,7 +684,7 @@ return view.extend({
 		o = s.option(form.DummyValue, '_latency', _('URLTest delay'));
 		o.textvalue = function(section_id) {
 			return E('span', {
-				'data-neto-latency-tag': outboundTag(section_id),
+				'data-zakop-latency-tag': outboundTag(section_id),
 				'style': 'font-size:1.1em;font-weight:600;white-space:nowrap'
 			}, _('Not tested'));
 		};
@@ -926,7 +926,7 @@ return view.extend({
 		pool.nodescriptions = true;
 		pool.modaltitle = _('Outbound pool details');
 		pool.sectiontitle = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		pool.renderSectionAdd = function() {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
@@ -936,11 +936,11 @@ return view.extend({
 
 		o = pool.option(form.Value, 'label', _('Name'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		o.write = function(section_id, formvalue) {
 			var label = String(formvalue || '').trim();
-			uci.set('neto', section_id, 'label', label || section_id);
+			uci.set('zakop', section_id, 'label', label || section_id);
 		};
 		o.validate = function(section_id, value) {
 			return String(value || section_id || '').trim() != '' ? true : _('Name is required');
@@ -950,7 +950,7 @@ return view.extend({
 
 		o = pool.option(form.DynamicList, 'outbound', _('Priority order'),
 			_('The top outbound has the highest priority. The next one is used only when every outbound above it is unavailable.'));
-		uci.sections('neto', 'outbound', function(section, sid) {
+		uci.sections('zakop', 'outbound', function(section, sid) {
 			var tag = String(section.tag || sid || section['.name'] || '').trim();
 			var label = String(section.label || section.name || tag).trim();
 
@@ -992,7 +992,7 @@ return view.extend({
 		sub.addremove = true;
 		sub.modaltitle = _('Subscription details');
 		sub.sectiontitle = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		sub.renderSectionAdd = function() {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
@@ -1000,7 +1000,7 @@ return view.extend({
 			el.appendChild(E('button', {
 				'class': 'cbi-button cbi-button-action',
 				'style': 'margin-left:.5em',
-				'data-neto-subscriptions-update-all': '1',
+				'data-zakop-subscriptions-update-all': '1',
 				'disabled': self.subscriptionUpdateAllRunning ? true : null,
 				'click': function(ev) {
 					ev.preventDefault();
@@ -1028,11 +1028,11 @@ return view.extend({
 
 		o = sub.option(form.Value, 'label', _('Name'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		o.write = function(section_id, formvalue) {
 			var label = String(formvalue || '').trim();
-			uci.set('neto', section_id, 'label', label || section_id);
+			uci.set('zakop', section_id, 'label', label || section_id);
 		};
 		o.rmempty = false;
 		o.modalonly = true;
@@ -1086,12 +1086,12 @@ return view.extend({
 
 		o = sub.option(form.DummyValue, 'node_count', _('Nodes'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'node_count') || '-';
+			return uci.get('zakop', section_id, 'node_count') || '-';
 		};
 
 		o = sub.option(form.DummyValue, 'last_update', _('Updated'));
 		o.cfgvalue = function(section_id) {
-			var value = uci.get('neto', section_id, 'last_update');
+			var value = uci.get('zakop', section_id, 'last_update');
 			var timestamp = Number(value);
 
 			if (!timestamp)

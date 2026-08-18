@@ -7,17 +7,17 @@ if [ "${1:-}" = "--purge" ]; then
 	PURGE=1
 fi
 
-if [ -x /etc/init.d/neto ]; then
-	/etc/init.d/neto stop || true
-	/etc/init.d/neto disable || true
+if [ -x /etc/init.d/zakop ]; then
+	/etc/init.d/zakop stop || true
+	/etc/init.d/zakop disable || true
 fi
 
-dns_listen="$(uci -q get neto.main.dns_listen || echo '127.0.0.1:5353')"
+dns_listen="$(uci -q get zakop.main.dns_listen || echo '127.0.0.1:5353')"
 dns_host="${dns_listen%:*}"
 dns_port="${dns_listen##*:}"
 dns_server="$dns_host#$dns_port"
-state_dir="/etc/neto/dnsmasq-state"
-legacy_state_dir="/var/lib/neto"
+state_dir="/etc/zakop/dnsmasq-state"
+legacy_state_dir="/var/lib/zakop"
 server_state="$state_dir/dnsmasq-server.prev"
 legacy_server_state="$legacy_state_dir/dnsmasq-server.prev"
 noresolv_state="$state_dir/dnsmasq-noresolv.prev"
@@ -37,7 +37,7 @@ read_state() {
 	return 1
 }
 
-is_neto_dnsmasq_server() {
+is_zakop_dnsmasq_server() {
 	value="$1"
 	current="$2"
 	saved="$3"
@@ -48,12 +48,12 @@ is_neto_dnsmasq_server() {
 	return 1
 }
 
-has_non_neto_dnsmasq_server() {
+has_non_zakop_dnsmasq_server() {
 	current="$1"
 	saved="$2"
 	servers="$(uci -q get dhcp.@dnsmasq[0].server || true)"
 	for value in $servers; do
-		if ! is_neto_dnsmasq_server "$value" "$current" "$saved"; then
+		if ! is_zakop_dnsmasq_server "$value" "$current" "$saved"; then
 			return 0
 		fi
 	done
@@ -83,37 +83,37 @@ if old_addsubnet="$(read_state "$addsubnet_state" "$legacy_addsubnet_state" 2>/d
 	fi
 fi
 current_noresolv="$(uci -q get dhcp.@dnsmasq[0].noresolv || true)"
-if [ "$current_noresolv" = "1" ] && ! has_non_neto_dnsmasq_server "$dns_server" "$saved_server"; then
+if [ "$current_noresolv" = "1" ] && ! has_non_zakop_dnsmasq_server "$dns_server" "$saved_server"; then
 	uci -q delete dhcp.@dnsmasq[0].noresolv || true
 fi
 current_addsubnet="$(uci -q get dhcp.@dnsmasq[0].addsubnet || true)"
-if [ "$current_addsubnet" = "32" ] && ! has_non_neto_dnsmasq_server "$dns_server" "$saved_server"; then
+if [ "$current_addsubnet" = "32" ] && ! has_non_zakop_dnsmasq_server "$dns_server" "$saved_server"; then
 	uci -q delete dhcp.@dnsmasq[0].addsubnet || true
 fi
 uci commit dhcp || true
 
-rm -f /etc/init.d/neto
-rm -f /usr/bin/netod
-rm -rf /usr/libexec/neto
-rm -rf /usr/share/neto
-rm -f /usr/share/luci/menu.d/luci-app-neto.json
-rm -f /usr/share/rpcd/acl.d/luci-app-neto.json
+rm -f /etc/init.d/zakop
+rm -f /usr/bin/zakopd
+rm -rf /usr/libexec/zakop
+rm -rf /usr/share/zakop
+rm -f /usr/share/luci/menu.d/luci-app-zakop.json
+rm -f /usr/share/rpcd/acl.d/luci-app-zakop.json
 for path in \
-	/www/luci-static/resources/view/neto \
-	/www/luci-static/resources/view/neto_* \
-	/www/luci-static/resources/neto \
-	/www/luci-static/resources/neto_*
+	/www/luci-static/resources/view/zakop \
+	/www/luci-static/resources/view/zakop_* \
+	/www/luci-static/resources/zakop \
+	/www/luci-static/resources/zakop_*
 do
 	[ -d "$path" ] && rm -rf "$path"
 done
-rm -rf /tmp/neto
-rm -rf /var/lib/neto
-rm -rf /etc/neto/dnsmasq-state
-rm -f /tmp/dnsmasq.d/neto.conf /etc/dnsmasq.d/neto.conf
+rm -rf /tmp/zakop
+rm -rf /var/lib/zakop
+rm -rf /etc/zakop/dnsmasq-state
+rm -f /tmp/dnsmasq.d/zakop.conf /etc/dnsmasq.d/zakop.conf
 
 if [ "$PURGE" -eq 1 ]; then
-	rm -f /etc/config/neto
-	rm -rf /etc/neto
+	rm -f /etc/config/zakop
+	rm -rf /etc/zakop
 fi
 
 if [ -x /etc/init.d/rpcd ]; then
@@ -126,4 +126,4 @@ if [ -x /etc/init.d/dnsmasq ]; then
 	/etc/init.d/dnsmasq reload || /etc/init.d/dnsmasq restart || true
 fi
 
-echo "neto uninstalled"
+echo "zakop uninstalled"

@@ -8,5 +8,5 @@
 
 embedded/files/etc/init.d/* text eol=lf
 embedded/files/etc/config/* text eol=lf
-embedded/files/usr/share/neto/* text eol=lf
+embedded/files/usr/share/zakop/* text eol=lf
 

@@ -11,7 +11,7 @@
 - domain include/exclude matchers.
 - mixed domain + provider/CIDR/IP rules.
 - packet-only `proto`, `src_port`, `dst_port` для IP/provider/CIDR rules.
-- DNS policy forwarding through netod.
+- DNS policy forwarding through zakopd.
 - FakeIP DNS through sing-box.
 - real DNS transport through sing-box UDP/TCP/DoT/DoH.
 - EDNS Client Subnet stripping before upstream DNS.
@@ -34,12 +34,12 @@ aarch64 with `apk`.
 
 1. Router-verify LuCI behavior after each UI change.
 2. Add more router-side integration tests for generated UCI from LuCI.
-3. Improve `netod debug` with DNS decision trace examples.
-4. Add `netod rules list`.
-5. Add `netod test-domain <client-ip> <domain> <qtype>`.
+3. Improve `zakopd debug` with DNS decision trace examples.
+4. Add `zakopd rules list`.
+5. Add `zakopd test-domain <client-ip> <domain> <qtype>`.
 6. Add better status for provider caches and last update errors.
 7. Add clearer LuCI validation messages for packet-level port/proto fields.
-8. Add CI release workflow for publishing `neto-openwrt-embedded.tar.gz`.
+8. Add CI release workflow for publishing `zakop-openwrt-embedded.tar.gz`.
 
 ## Later Tasks
 
@@ -53,7 +53,7 @@ aarch64 with `apk`.
 ## Explicitly Not in v1
 
 - IPv6 routing.
-- Transparent TCP/UDP proxy inside netod.
+- Transparent TCP/UDP proxy inside zakopd.
 - Custom FakeIP allocator.
 - fw3/iptables support.
 - Full `.ipk` packaging.

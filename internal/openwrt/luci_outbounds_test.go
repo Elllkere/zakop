@@ -7,7 +7,7 @@ import (
 )
 
 func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,16 +26,16 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"form.Value, 'label'",
 		"o.cfgvalue = function(section_id)",
 		"o.write = function(section_id, formvalue)",
-		"uci.set('neto', section_id, 'label', label || section_id)",
-		"uci.set('neto', sid, 'tag', sid)",
+		"uci.set('zakop', section_id, 'label', label || section_id)",
+		"uci.set('zakop', sid, 'tag', sid)",
 		"o.value('vless'",
 		"o.value('hysteria2'",
 		"o.value('shadowsocks'",
 		"o.value('trojan'",
 		"o.default = 'vless'",
 		"form.Value, 'server', _('Address')",
-		"uci.get('neto', section_id, 'server') || uci.get('neto', section_id, 'address')",
-		"uci.set('neto', section_id, 'server', String(formvalue || '').trim())",
+		"uci.get('zakop', section_id, 'server') || uci.get('zakop', section_id, 'address')",
+		"uci.set('zakop', section_id, 'server', String(formvalue || '').trim())",
 		"reality_public_key",
 		"tls_min_version",
 		"tls_max_version",
@@ -50,7 +50,7 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"password",
 		"handleOutboundLatencyTest: function()",
 		"runOutboundLatencyTests: function(targets)",
-		"fs.exec('/usr/bin/netod', [ 'outbounds', 'latency', target.tag ])",
+		"fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency', target.tag ])",
 		"outboundLatencyFailure: function(target, error)",
 		"updateOutboundLatencyResults: function(report)",
 		"setOutboundLatencyStatus: function(text, className, title, tag)",
@@ -58,9 +58,9 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"_('Testing %d/%d…').format(current, total)",
 		"form.DummyValue, '_latency', _('URLTest delay')",
 		"o.textvalue = function(section_id)",
-		"'data-neto-latency-tag': outboundTag(section_id)",
+		"'data-zakop-latency-tag': outboundTag(section_id)",
 		"'style': 'font-size:1.1em;font-weight:600;white-space:nowrap'",
-		"'data-neto-latency-button': '1'",
+		"'data-zakop-latency-button': '1'",
 		"self.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag)",
 		"_('Test latency')",
 		"cellResult.latency_ms",
@@ -76,12 +76,12 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"o.value('socks5'",
 		"o.value('mixed'",
 		"o.default = 'proxy_default'",
-		"uci.set('neto', 'proxy_default', 'outbound')",
+		"uci.set('zakop', 'proxy_default', 'outbound')",
 		"form.value, 'tag'",
 		"showoutboundlatencyresults",
 		"ui.showmodal(_('outbound latency test')",
 		"o.renderwidget = function(section_id)",
-		"fs.exec('/usr/bin/netod', [ 'outbounds', 'latency' ])",
+		"fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency' ])",
 	} {
 		if strings.Contains(strings.ToLower(s), forbidden) {
 			t.Fatalf("outbounds.js must not expose %q:\n%s", forbidden, s)
@@ -105,7 +105,7 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 }
 
 func TestOutboundsLuCIExposesPriorityPools(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestOutboundsLuCIExposesPriorityPools(t *testing.T) {
 		"form.Value, 'check_interval'",
 		"concreteOutboundTagExists(members[i])",
 		"The top outbound has the highest priority.",
-		"uci.sections('neto', 'outbound_pool'",
+		"uci.sections('zakop', 'outbound_pool'",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("outbounds.js missing pool behavior %q:\n%s", want, s)
@@ -133,39 +133,39 @@ func TestOutboundsLuCIExposesPriorityPools(t *testing.T) {
 
 func TestEveryProxyOutboundSelectorIncludesPools(t *testing.T) {
 	paths := []string{
-		"../../embedded/files/www/luci-static/resources/view/neto/general.js",
-		"../../embedded/files/www/luci-static/resources/view/neto/clients.js",
-		"../../embedded/files/www/luci-static/resources/view/neto/rules.js",
-		"../../embedded/files/www/luci-static/resources/view/neto/providers.js",
-		"../../embedded/files/www/luci-static/resources/view/neto/outbounds.js",
+		"../../embedded/files/www/luci-static/resources/view/zakop/general.js",
+		"../../embedded/files/www/luci-static/resources/view/zakop/clients.js",
+		"../../embedded/files/www/luci-static/resources/view/zakop/rules.js",
+		"../../embedded/files/www/luci-static/resources/view/zakop/providers.js",
+		"../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js",
 	}
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(data), "uci.sections('neto', 'outbound_pool'") {
+		if !strings.Contains(string(data), "uci.sections('zakop', 'outbound_pool'") {
 			t.Fatalf("%s does not include outbound pools", path)
 		}
 	}
 }
 
 func TestOutboundActionsDoNotCreateSyntheticPoolTagChanges(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, forbidden := range []string{
 		"function normalizePools()",
-		"uci.set('neto', sid, 'tag', sid);\n\n\t\tif (String(uci.get('neto', sid, 'label')",
+		"uci.set('zakop', sid, 'tag', sid);\n\n\t\tif (String(uci.get('zakop', sid, 'label')",
 	} {
 		if strings.Contains(s, forbidden) {
 			t.Fatalf("outbounds.js must not create synthetic pool changes %q:\n%s", forbidden, s)
 		}
 	}
 	for _, want := range []string{
-		"uci.unload('neto')",
+		"uci.unload('zakop')",
 		"return ui.changes.init()",
 	} {
 		if !strings.Contains(s, want) {
@@ -175,7 +175,7 @@ func TestOutboundActionsDoNotCreateSyntheticPoolTagChanges(t *testing.T) {
 }
 
 func TestOutboundsLuCITableOnlySectionNameTypeAddressPortAndLatency(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestOutboundsLuCITableOnlySectionNameTypeAddressPortAndLatency(t *testing.T
 }
 
 func TestOutboundsLuCIHomeProxyLikeControlsAndDependencies(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,12 +272,12 @@ func TestOutboundsLuCIHomeProxyLikeControlsAndDependencies(t *testing.T) {
 }
 
 func TestOutboundsLuCIMenuEntry(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/usr/share/luci/menu.d/luci-app-neto.json")
+	data, err := os.ReadFile("../../embedded/files/usr/share/luci/menu.d/luci-app-zakop.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
-	if !strings.Contains(s, `"admin/services/neto/outbounds"`) || !strings.Contains(s, `"path": "neto/outbounds"`) {
+	if !strings.Contains(s, `"admin/services/zakop/outbounds"`) || !strings.Contains(s, `"path": "zakop/outbounds"`) {
 		t.Fatalf("menu missing outbounds page:\n%s", s)
 	}
 }

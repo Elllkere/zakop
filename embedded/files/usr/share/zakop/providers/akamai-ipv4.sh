@@ -11,7 +11,7 @@ AS63949
 AS32787
 "
 
-WORK_DIR="${TMPDIR:-/tmp}/neto-akamai-ipv4.$$"
+WORK_DIR="${TMPDIR:-/tmp}/zakop-akamai-ipv4.$$"
 LIST_FILE="$WORK_DIR/prefixes.txt"
 RESULT_FILE="$WORK_DIR/result.txt"
 
@@ -23,8 +23,8 @@ trap cleanup EXIT INT TERM
 fetch_url() {
 	url="$1"
 
-	if [ -n "${NETO_PROVIDER_PROXY:-}" ]; then
-		curl -fsSL --connect-timeout 15 --max-time 60 --proxy "$NETO_PROVIDER_PROXY" "$url"
+	if [ -n "${ZAKOP_PROVIDER_PROXY:-}" ]; then
+		curl -fsSL --connect-timeout 15 --max-time 60 --proxy "$ZAKOP_PROVIDER_PROXY" "$url"
 	else
 		curl -fsSL --connect-timeout 15 --max-time 60 --noproxy "*" "$url"
 	fi
@@ -56,7 +56,7 @@ mkdir -p "$WORK_DIR"
 for asn in $AKAMAI_ASNS; do
 	url="https://stat.ripe.net/data/announced-prefixes/data.json?resource=${asn}"
 	json_file="$WORK_DIR/${asn}.json"
-	echo "neto: fetching Akamai prefixes for ${asn}" >&2
+	echo "zakop: fetching Akamai prefixes for ${asn}" >&2
 	fetch_url "$url" > "$json_file"
 	extract_ripe_prefixes < "$json_file" >> "$LIST_FILE"
 done
@@ -64,12 +64,12 @@ done
 sort -u "$LIST_FILE" > "$RESULT_FILE"
 
 if [ ! -s "$RESULT_FILE" ]; then
-	echo "neto: Akamai IPv4 provider returned an empty list" >&2
+	echo "zakop: Akamai IPv4 provider returned an empty list" >&2
 	exit 1
 fi
 
-if [ -n "${NETO_PROVIDER_OUTPUT:-}" ]; then
-	cp "$RESULT_FILE" "$NETO_PROVIDER_OUTPUT"
+if [ -n "${ZAKOP_PROVIDER_OUTPUT:-}" ]; then
+	cp "$RESULT_FILE" "$ZAKOP_PROVIDER_OUTPUT"
 else
 	cat "$RESULT_FILE"
 fi

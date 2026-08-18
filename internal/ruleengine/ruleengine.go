@@ -3,7 +3,7 @@ package ruleengine
 import (
 	"strings"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 type Decision struct {

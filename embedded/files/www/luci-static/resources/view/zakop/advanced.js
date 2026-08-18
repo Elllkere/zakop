@@ -4,19 +4,19 @@
 'require ui';
 'require uci';
 'require view';
-'require neto.i18n as netoI18n';
-'require neto.ui as netoUI';
+'require zakop.i18n as zakopI18n';
+'require zakop.ui as zakopUI';
 
-var _ = netoI18n.translate;
+var _ = zakopI18n.translate;
 
 function forceAdvancedState() {
-	uci.set('neto', 'main', 'fakeip_enabled', '1');
+	uci.set('zakop', 'main', 'fakeip_enabled', '1');
 }
 
 return view.extend({
 	load: function() {
-		return uci.load('neto').then(function() {
-			netoUI.syncRulesTab();
+		return uci.load('zakop').then(function() {
+			zakopUI.syncRulesTab();
 		});
 	},
 
@@ -29,16 +29,16 @@ return view.extend({
 	handleSaveApply: function(ev) {
 		return this.handleSave(ev)
 			.then(function() {
-				return netoUI.applyAndRestart();
+				return zakopUI.applyAndRestart();
 			});
 	},
 
 	render: function() {
 		var m, s, o;
 
-		netoUI.syncRulesTab();
+		zakopUI.syncRulesTab();
 
-		m = new form.Map('neto', _('neto'));
+		m = new form.Map('zakop', _('zakop'));
 		this.map = m;
 
 		s = m.section(form.NamedSection, 'main', 'main', _('Advanced'));
@@ -67,7 +67,7 @@ return view.extend({
 		o.placeholder = 'br-lan';
 
 		o = s.option(form.Value, 'singbox_bin', _('sing-box binary'));
-		o.placeholder = '/usr/libexec/neto/sing-box';
+		o.placeholder = '/usr/libexec/zakop/sing-box';
 
 		o = s.option(form.Value, 'singbox_dns_fakeip', _('FakeIP DNS listener'));
 		o.placeholder = '127.0.0.1:15353';

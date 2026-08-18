@@ -1,6 +1,6 @@
 # Router Testing
 
-Команды ниже выполняются на OpenWrt/ImmortalWrt router после установки `neto`.
+Команды ниже выполняются на OpenWrt/ImmortalWrt router после установки `zakop`.
 
 Technical terms (`direct`, `proxy`, `block`, `FakeIP`, `TProxy`, `provider`,
 `outbound`) оставлены как в UCI/LuCI/CLI.
@@ -8,24 +8,24 @@ Technical terms (`direct`, `proxy`, `block`, `FakeIP`, `TProxy`, `provider`,
 ## Install Check
 
 ```sh
-netod version
-netod check
-netod compile
-/usr/libexec/neto/sing-box check -c /tmp/neto/sing-box.json
-/etc/init.d/neto restart
-netod status
+zakopd version
+zakopd check
+zakopd compile
+/usr/libexec/zakop/sing-box check -c /tmp/zakop/sing-box.json
+/etc/init.d/zakop restart
+zakopd status
 ```
 
 Если используется system `sing-box`:
 
 ```sh
-sing-box check -c /tmp/neto/sing-box.json
+sing-box check -c /tmp/zakop/sing-box.json
 ```
 
 Logs:
 
 ```sh
-logread | grep -E 'netod|sing-box|dnsmasq' | tail -n 120
+logread | grep -E 'zakopd|sing-box|dnsmasq' | tail -n 120
 ```
 
 ## Routing Semantics
@@ -41,7 +41,7 @@ logread | grep -E 'netod|sing-box|dnsmasq' | tail -n 120
 Client policy:
 
 - `default`: follows `routing_mode`;
-- `proxy`: forces non-reserved traffic from this client through neto;
+- `proxy`: forces non-reserved traffic from this client through zakop;
 - `direct`: hard bypass, real DNS only, no FakeIP.
 
 Rules are evaluated by ascending `priority`.
@@ -107,18 +107,18 @@ On a fresh install, import provider presets from the LuCI Providers page before
 using the built-in provider names below.
 
 ```sh
-netod providers update
-netod providers update cloudflare_ipv4
-/etc/init.d/neto restart
+zakopd providers update
+zakopd providers update cloudflare_ipv4
+/etc/init.d/zakop restart
 ```
 
 Provider cache files live in persistent storage:
 
 ```text
-/etc/neto/provider-cache/
+/etc/zakop/provider-cache/
 ```
 
-`/var/lib/neto/providers/` is a legacy cache path and may disappear on OpenWrt
+`/var/lib/zakop/providers/` is a legacy cache path and may disappear on OpenWrt
 because `/var` can be linked to volatile `/tmp`.
 
 If a provider cache is missing, compile/startup should warn and continue with
@@ -128,8 +128,8 @@ On a fresh install, import provider presets from the LuCI Providers page before
 using the built-in provider names below.
 
 ```sh
-netod providers update telegram_ipv4
-netod compile
+zakopd providers update telegram_ipv4
+zakopd compile
 ```
 
 ## Rule Examples
@@ -187,7 +187,7 @@ Mixed semantics:
 
 ## DNS Tests
 
-Local netod listener:
+Local zakopd listener:
 
 ```sh
 dig @127.0.0.1 -p 5353 youtube.com A
@@ -217,12 +217,12 @@ nslookup -type=A youtube.com 192.168.8.1
 nslookup -type=AAAA youtube.com 192.168.8.1
 ```
 
-If Google DNS returns `Query refused`, check that installed netod strips EDNS
+If Google DNS returns `Query refused`, check that installed zakopd strips EDNS
 Client Subnet:
 
 ```sh
-netod version
-logread | grep -E 'netod|dnsmasq|sing-box' | tail -n 120
+zakopd version
+logread | grep -E 'zakopd|dnsmasq|sing-box' | tail -n 120
 ```
 
 ## nft/TProxy Checks
@@ -230,7 +230,7 @@ logread | grep -E 'netod|dnsmasq|sing-box' | tail -n 120
 Inspect table:
 
 ```sh
-nft list table inet neto
+nft list table inet zakop
 ```
 
 Expected order:
@@ -249,7 +249,7 @@ Expected order:
 Check packet port rules:
 
 ```sh
-nft list table inet neto | grep -E 'tcp dport|udp dport|sport'
+nft list table inet zakop | grep -E 'tcp dport|udp dport|sport'
 ```
 
 Examples:
@@ -277,7 +277,7 @@ local default dev lo
 
 DNS terminology:
 
-- `dns_listen`: local netod listener used by dnsmasq.
+- `dns_listen`: local zakopd listener used by dnsmasq.
 - `singbox_dns_fakeip`: FakeIP listener, default `127.0.0.1:15353`.
 - `singbox_dns_real_direct`: real DNS direct listener, default
   `127.0.0.1:15354`.
@@ -305,7 +305,7 @@ option real_dns_outbound 'my_vless'
 
 ## dnsmasq Integration
 
-When `manage_dnsmasq=1`, neto configures dnsmasq to forward DNS to netod:
+When `manage_dnsmasq=1`, zakop configures dnsmasq to forward DNS to zakopd:
 
 ```sh
 uci show dhcp.@dnsmasq[0] | grep -E "server|noresolv|addsubnet"
@@ -319,36 +319,36 @@ noresolv='1'
 addsubnet='32'
 ```
 
-`addsubnet=32` is used only so netod can recover LAN client IP. netod strips
+`addsubnet=32` is used only so zakopd can recover LAN client IP. zakopd strips
 EDNS Client Subnet before forwarding DNS to sing-box/public resolvers.
 
-When `manage_dnsmasq=1`, neto also redirects plain IPv4 LAN DNS on TCP/UDP port
+When `manage_dnsmasq=1`, zakop also redirects plain IPv4 LAN DNS on TCP/UDP port
 53 to dnsmasq. This is required for domain/FakeIP rules when clients behind a
 bridge or AP use another classic DNS server. DoH/DoT bypasses this interception.
 Check the rules with:
 
 ```sh
-nft list chain inet neto dns_prerouting
+nft list chain inet zakop dns_prerouting
 ```
 
 Expected rules contain `udp dport 53 redirect to :53` and
 `tcp dport 53 redirect to :53`.
 
-Stopping neto should restore previous dnsmasq state:
+Stopping zakop should restore previous dnsmasq state:
 
 ```sh
-/etc/init.d/neto stop
+/etc/init.d/zakop stop
 uci show dhcp.@dnsmasq[0] | grep '127.0.0.1#5353'
 ```
 
 ## Debug Bundle
 
 ```sh
-netod debug
-uci show neto
-nft list table inet neto
-grep -nE 'rule_set|rule-set|/tmp/sing-box/rulesets|"detour": "direct"' /tmp/neto/sing-box.json
-logread | grep -E 'netod|sing-box|dnsmasq' | tail -n 120
+zakopd debug
+uci show zakop
+nft list table inet zakop
+grep -nE 'rule_set|rule-set|/tmp/sing-box/rulesets|"detour": "direct"' /tmp/zakop/sing-box.json
+logread | grep -E 'zakopd|sing-box|dnsmasq' | tail -n 120
 ```
 
 `grep` above should not find legacy sing-box rule-set paths or
@@ -359,23 +359,23 @@ logread | grep -E 'netod|sing-box|dnsmasq' | tail -n 120
 From repository root:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ./scripts/test-archive.sh
-./embedded/install.sh --local ./dist/neto-openwrt-embedded.tar.gz --verbose
+./embedded/install.sh --local ./dist/zakop-openwrt-embedded.tar.gz --verbose
 ```
 
 Dry-run:
 
 ```sh
 ./embedded/install.sh --dry-run
-./embedded/install.sh --local ./dist/neto-openwrt-embedded.tar.gz --dry-run
+./embedded/install.sh --local ./dist/zakop-openwrt-embedded.tar.gz --dry-run
 ```
 
 Uninstall on router:
 
 ```sh
-/usr/share/neto/uninstall.sh
-/usr/share/neto/uninstall.sh --purge
+/usr/share/zakop/uninstall.sh
+/usr/share/zakop/uninstall.sh --purge
 ```
 
-Without `--purge`, `/etc/config/neto` and `/etc/neto` are kept for reinstall.
+Without `--purge`, `/etc/config/zakop` and `/etc/zakop` are kept for reinstall.

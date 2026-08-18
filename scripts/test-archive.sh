@@ -3,8 +3,8 @@
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-ARCHIVE="${1:-$ROOT_DIR/dist/neto-openwrt-embedded.tar.gz}"
-TMP="${TMPDIR:-/tmp}/neto-archive-test.$$"
+ARCHIVE="${1:-$ROOT_DIR/dist/zakop-openwrt-embedded.tar.gz}"
+TMP="${TMPDIR:-/tmp}/zakop-archive-test.$$"
 
 cleanup() {
 	rm -rf "$TMP"
@@ -18,8 +18,8 @@ trap cleanup EXIT INT TERM
 
 mkdir -p "$TMP"
 tar -xzf "$ARCHIVE" -C "$TMP"
-if [ -d "$TMP/neto" ]; then
-	TMP="$TMP/neto"
+if [ -d "$TMP/zakop" ]; then
+	TMP="$TMP/zakop"
 fi
 
 for target in \
@@ -29,13 +29,13 @@ for target in \
 	linux-mips-softfloat \
 	linux-mipsle-softfloat
 do
-	[ -x "$TMP/bin/$target/netod" ] || {
-		echo "missing netod for $target" >&2
+	[ -x "$TMP/bin/$target/zakopd" ] || {
+		echo "missing zakopd for $target" >&2
 		exit 1
 	}
 done
 
-[ -f "$TMP/files/etc/config/neto" ] || {
+[ -f "$TMP/files/etc/config/zakop" ] || {
 	echo "missing default UCI config" >&2
 	exit 1
 }
@@ -51,17 +51,17 @@ done
 	echo "missing upgrade.sh" >&2
 	exit 1
 }
-[ -s "$TMP/neto-version.txt" ] || {
-	echo "missing neto-version.txt" >&2
+[ -s "$TMP/zakop-version.txt" ] || {
+	echo "missing zakop-version.txt" >&2
 	exit 1
 }
-[ -s "$TMP/neto-ui-cache.txt" ] || {
+[ -s "$TMP/zakop-ui-cache.txt" ] || {
 	echo "missing LuCI cache namespace" >&2
 	exit 1
 }
-ui_namespace="$(sed -n '1{s/[[:space:]]//g;p;}' "$TMP/neto-ui-cache.txt")"
+ui_namespace="$(sed -n '1{s/[[:space:]]//g;p;}' "$TMP/zakop-ui-cache.txt")"
 case "$ui_namespace" in
-	neto_[0-9]*) ;;
+	zakop_[0-9]*) ;;
 	*)
 		echo "invalid LuCI cache namespace: $ui_namespace" >&2
 		exit 1
@@ -76,17 +76,17 @@ esac
 	exit 1
 }
 grep -Fq "\"path\": \"$ui_namespace/outbounds\"" \
-	"$TMP/files/usr/share/luci/menu.d/luci-app-neto.json" || {
+	"$TMP/files/usr/share/luci/menu.d/luci-app-zakop.json" || {
 	echo "LuCI menu does not reference versioned outbounds view" >&2
 	exit 1
 }
-expected_version="$(sed -n '1{s/[[:space:]]//g;p;}' "$TMP/neto-version.txt")"
-actual_version="$("$TMP/bin/linux-amd64/netod" version | awk '{ print $2; exit }')"
+expected_version="$(sed -n '1{s/[[:space:]]//g;p;}' "$TMP/zakop-version.txt")"
+actual_version="$("$TMP/bin/linux-amd64/zakopd" version | awk '{ print $2; exit }')"
 [ "$actual_version" = "$expected_version" ] || {
-	echo "archive version mismatch: manifest=$expected_version netod=$actual_version" >&2
+	echo "archive version mismatch: manifest=$expected_version zakopd=$actual_version" >&2
 	exit 1
 }
-[ -x "$TMP/files/usr/share/neto/check-version.sh" ] || {
+[ -x "$TMP/files/usr/share/zakop/check-version.sh" ] || {
 	echo "missing check-version.sh" >&2
 	exit 1
 }

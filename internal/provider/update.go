@@ -11,8 +11,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/policy"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/policy"
 )
 
 func NormalizeDownloadedList(provider config.Provider, data []byte) ([]string, error) {

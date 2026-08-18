@@ -12,7 +12,7 @@ func TestParseInitialConfig(t *testing.T) {
 	cfg, err := Parse(withTestOutbound(`
 config main 'main'
 	option enabled '1'
-	option singbox_bin '/usr/libexec/neto/sing-box'
+	option singbox_bin '/usr/libexec/zakop/sing-box'
 	option singbox_dns '127.0.0.1:15353'
 	option tproxy_port '16001'
 	option mark '0x101'
@@ -45,7 +45,7 @@ config rule
 	option action 'proxy'
 	option dns_mode 'real_ip'
 	option outbound 'direct'
-	list file '/etc/neto/providers/cloudflare-v4.txt'
+	list file '/etc/zakop/providers/cloudflare-v4.txt'
 `))
 	if err != nil {
 		t.Fatal(err)
@@ -401,9 +401,9 @@ config main 'main'
 	list simple_ip_provider 'cloudflare'
 	list simple_domain_equals 'Example.COM.'
 	list simple_domain_ends_with '.Example.ORG.'
-	list simple_domain_file '/etc/neto/domains.txt'
+	list simple_domain_file '/etc/zakop/domains.txt'
 	list simple_ip_cidr '1.1.1.1'
-	list simple_ip_file '/etc/neto/ips.txt'
+	list simple_ip_file '/etc/zakop/ips.txt'
 
 config provider 'telegram'
 	option enabled '1'
@@ -444,7 +444,7 @@ config outbound 'my_vless'
 	if strings.Join(r.IPCIDRs, ",") != "1.1.1.1" {
 		t.Fatalf("unexpected simple CIDRs: %+v", r)
 	}
-	if strings.Join(r.DomainFiles, ",") != "/etc/neto/domains.txt" || strings.Join(r.Files, ",") != "/etc/neto/ips.txt" {
+	if strings.Join(r.DomainFiles, ",") != "/etc/zakop/domains.txt" || strings.Join(r.Files, ",") != "/etc/zakop/ips.txt" {
 		t.Fatalf("unexpected simple files: %+v", r)
 	}
 }
@@ -549,7 +549,7 @@ config rule
 	option name 'alternate_domains'
 	option action 'proxy'
 	option dns_mode 'auto'
-	list domain_file '/etc/neto/domains/youtube.txt'
+	list domain_file '/etc/zakop/domains/youtube.txt'
 	list domain_provider 'youtube_domains'
 
 config rule
@@ -558,8 +558,8 @@ config rule
 	option dns_mode 'auto'
 	list ip_cidr '1.1.1.1'
 	list ip_cidr '8.8.8.0/24'
-	list ip_file '/etc/neto/providers/google.txt'
-	list file '/etc/neto/providers/legacy.txt'
+	list ip_file '/etc/zakop/providers/google.txt'
+	list file '/etc/zakop/providers/legacy.txt'
 	list ip_provider 'google_ips'
 	list provider 'legacy_provider'
 
@@ -579,7 +579,7 @@ config provider 'legacy_provider'
 		t.Fatal(err)
 	}
 	domainRule := cfg.Rules[0]
-	if len(domainRule.DomainFiles) != 1 || domainRule.DomainFiles[0] != "/etc/neto/domains/youtube.txt" {
+	if len(domainRule.DomainFiles) != 1 || domainRule.DomainFiles[0] != "/etc/zakop/domains/youtube.txt" {
 		t.Fatalf("domain files were not parsed: %+v", domainRule)
 	}
 	if len(domainRule.DomainProviders) != 1 || domainRule.DomainProviders[0] != "youtube_domains" {
@@ -589,7 +589,7 @@ config provider 'legacy_provider'
 	if len(ipRule.IPCIDRs) != 2 || ipRule.IPCIDRs[0] != "1.1.1.1" || ipRule.IPCIDRs[1] != "8.8.8.0/24" {
 		t.Fatalf("inline IP CIDRs were not parsed: %+v", ipRule)
 	}
-	if len(ipRule.Files) != 2 || ipRule.Files[0] != "/etc/neto/providers/google.txt" || ipRule.Files[1] != "/etc/neto/providers/legacy.txt" {
+	if len(ipRule.Files) != 2 || ipRule.Files[0] != "/etc/zakop/providers/google.txt" || ipRule.Files[1] != "/etc/zakop/providers/legacy.txt" {
 		t.Fatalf("ip_file/file aliases were not parsed: %+v", ipRule)
 	}
 	if len(ipRule.IPProviders) != 1 || ipRule.IPProviders[0] != "google_ips" || len(ipRule.Providers) != 1 || ipRule.Providers[0] != "legacy_provider" {
@@ -600,7 +600,7 @@ config provider 'legacy_provider'
 func TestLoadFileExpandsDomainFilesAsEquals(t *testing.T) {
 	dir := t.TempDir()
 	domains := filepath.Join(dir, "domains.txt")
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 
 	if err := os.WriteFile(domains, []byte("Example.COM.\n# comment\nexample.org\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -627,7 +627,7 @@ config rule
 func TestLoadFileExpandsDomainProviderCacheAsRootAndSubdomains(t *testing.T) {
 	dir := t.TempDir()
 	cache := filepath.Join(dir, "provider.txt")
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 
 	if err := os.WriteFile(cache, []byte("YouTube.COM. www.youtube.com\nx.com twimg.com # comment\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -844,7 +844,7 @@ config provider 'youtube'
 	option update_minute '17'
 	option update_via 'proxy'
 	option update_outbound 'updater'
-	option local_path '/var/lib/neto/providers/youtube.txt'
+	option local_path '/var/lib/zakop/providers/youtube.txt'
 	option last_update '1710000000'
 	option item_count '2'
 
@@ -912,7 +912,7 @@ config provider 'json_ips'
 	option label 'JSON IPs'
 	option type 'ip'
 	option source 'script'
-	option script_path '/usr/share/neto/providers/json-ips.sh'
+	option script_path '/usr/share/zakop/providers/json-ips.sh'
 	option url 'https://example.com/ips.json'
 	option auto_update '1'
 	option update_hour '4'
@@ -925,7 +925,7 @@ config provider 'json_ips'
 		t.Fatalf("unexpected providers: %+v", cfg.Providers)
 	}
 	p := cfg.Providers[0]
-	if p.Name != "json_ips" || p.Type != "ip" || p.Source != "script" || p.ScriptPath != "/usr/share/neto/providers/json-ips.sh" || p.UpdateHour != 4 || p.UpdateMinute != 42 {
+	if p.Name != "json_ips" || p.Type != "ip" || p.Source != "script" || p.ScriptPath != "/usr/share/zakop/providers/json-ips.sh" || p.UpdateHour != 4 || p.UpdateMinute != 42 {
 		t.Fatalf("unexpected provider: %+v", p)
 	}
 }
@@ -1317,7 +1317,7 @@ config outbound 'my_vless'
 	list tls_cipher_suites 'TLS_AES_128_GCM_SHA256'
 	option tls_ech '1'
 	list tls_ech_config 'ech-config'
-	option tls_ech_config_path '/etc/neto/ech.pem'
+	option tls_ech_config_path '/etc/zakop/ech.pem'
 	option tls_utls 'chrome'
 	option tls_reality '1'
 	option tls_reality_public_key 'public-key'
@@ -1339,7 +1339,7 @@ config outbound 'my_vless'
 	if len(out.ALPN) != 2 || out.TLSMinVersion != "1.2" || out.TLSMaxVersion != "1.3" || len(out.TLSCipherSuites) != 1 {
 		t.Fatalf("advanced TLS fields not parsed: %+v", out)
 	}
-	if !out.ECH || len(out.ECHConfig) != 1 || out.ECHConfigPath != "/etc/neto/ech.pem" || out.UTLSFingerprint != "chrome" {
+	if !out.ECH || len(out.ECHConfig) != 1 || out.ECHConfigPath != "/etc/zakop/ech.pem" || out.UTLSFingerprint != "chrome" {
 		t.Fatalf("ECH/uTLS fields not parsed: %+v", out)
 	}
 	if out.Transport != "ws" || out.WSHost != "front.example.com" || out.WSPath != "/ws" || out.WSEarlyData != 2048 || out.PacketEncoding != "xudp" {

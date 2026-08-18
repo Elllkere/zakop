@@ -4,9 +4,9 @@
 /tmp/
 
 # Local binaries produced during development
-/netod
-/cmd/netod/netod
-/embedded/bin/*/netod
+/zakopd
+/cmd/zakopd/zakopd
+/embedded/bin/*/zakopd
 /embedded/bin/*/sing-box
 !/embedded/bin/README.md
 

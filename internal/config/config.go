@@ -12,14 +12,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elllkere/neto/internal/policy"
+	"github.com/elllkere/zakop/internal/policy"
 )
 
-const DefaultPath = "/etc/config/neto"
+const DefaultPath = "/etc/config/zakop"
 
-var ProviderCacheDir = "/etc/neto/provider-cache"
-var ProviderPersistentCacheDir = "/etc/neto/provider-cache"
-var ProviderLegacyCacheDir = "/var/lib/neto/providers"
+var ProviderCacheDir = "/etc/zakop/provider-cache"
+var ProviderPersistentCacheDir = "/etc/zakop/provider-cache"
+var ProviderLegacyCacheDir = "/var/lib/zakop/providers"
 
 const (
 	BuiltinDirectOutbound  = "direct"
@@ -350,7 +350,7 @@ func Defaults() Config {
 			DNSUpstreamPath:       "/dns-query",
 			ManageDNSMasq:         true,
 			FilterAAAAForFakeIP:   true,
-			SingBoxBin:            "/usr/libexec/neto/sing-box",
+			SingBoxBin:            "/usr/libexec/zakop/sing-box",
 			SingBoxDNS:            "127.0.0.1:15353",
 			SingBoxDNSFakeIP:      "127.0.0.1:15353",
 			SingBoxDNSRealDirect:  "127.0.0.1:15354",
@@ -1626,7 +1626,7 @@ func loadRuleDomainFiles(cfg *Config, rule *Rule) error {
 					values, err = loadDomainFile(provider.CachePath())
 				}
 				if os.IsNotExist(err) {
-					cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("provider %q cache %q is missing; skipping provider until netod providers update %s", provider.Name, provider.CachePath(), provider.Name))
+					cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("provider %q cache %q is missing; skipping provider until zakopd providers update %s", provider.Name, provider.CachePath(), provider.Name))
 					continue
 				}
 			}

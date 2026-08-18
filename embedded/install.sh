@@ -2,20 +2,21 @@
 
 set -eu
 
-BASE_URL="${NETO_BASE_URL:-https://github.com/elllkere/neto/releases/latest/download}"
-ARCHIVE_NAME="neto-openwrt-embedded.tar.gz"
-WORK_DIR="${TMPDIR:-/tmp}/neto-install.$$"
-MANAGED_SINGBOX="/usr/libexec/neto/sing-box"
+BASE_URL="${ZAKOP_BASE_URL:-https://github.com/elllkere/zakop/releases/latest/download}"
+ARCHIVE_NAME="zakop-openwrt-embedded.tar.gz"
+WORK_DIR="${TMPDIR:-/tmp}/zakop-install.$$"
+MANAGED_SINGBOX="/usr/libexec/zakop/sing-box"
 MIN_SINGBOX_VERSION="1.12.0"
 LOCAL_ARCHIVE=""
 DRY_RUN=0
 VERBOSE=0
 LANGUAGE_CHOICE=""
 EXISTING_INSTALL=0
+LEGACY_NETO_INSTALL=0
 
 usage() {
 	cat >&2 <<'EOF'
-usage: install.sh [--local ./dist/neto-openwrt-embedded.tar.gz] [--dry-run] [--verbose] [--language en|ru]
+usage: install.sh [--local ./dist/zakop-openwrt-embedded.tar.gz] [--dry-run] [--verbose] [--language en|ru]
 EOF
 }
 
@@ -77,12 +78,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 die() {
-	echo "neto install: $*" >&2
+	echo "zakop install: $*" >&2
 	exit 1
 }
 
 log() {
-	echo "neto install: $*"
+	echo "zakop install: $*"
 }
 
 dry_log() {
@@ -95,7 +96,7 @@ atomic_install() {
 	local src="$1"
 	local dest="$2"
 	local mode="${3:-0755}"
-	local tmp="${dest}.neto-new.$$"
+	local tmp="${dest}.zakop-new.$$"
 
 	rm -f "$tmp"
 	if ! cp "$src" "$tmp"; then
@@ -212,8 +213,8 @@ collect_arch_hints() {
 }
 
 detect_arch() {
-	if [ -n "${NETO_ARCH:-}" ]; then
-		echo "$NETO_ARCH"
+	if [ -n "${ZAKOP_ARCH:-}" ]; then
+		echo "$ZAKOP_ARCH"
 		return
 	fi
 
@@ -279,10 +280,178 @@ check_runtime_curl() {
 	fi
 	if command -v curl >/dev/null 2>&1; then
 		log "warning: /usr/bin/curl is installed but cannot start"
-		log "warning: neto will install using wget where possible, but provider and subscription updates need a working curl"
+		log "warning: zakop will install using wget where possible, but provider and subscription updates need a working curl"
 	else
 		log "warning: curl is not installed; provider and subscription updates need curl"
 	fi
+}
+
+legacy_neto_detected() {
+	local path
+
+	for path in \
+		/etc/config/neto \
+		/etc/init.d/neto \
+		/etc/rc.d/S*neto \
+		/etc/rc.d/K*neto \
+		/usr/bin/netod \
+		/usr/libexec/neto \
+		/usr/share/neto \
+		/usr/share/luci/menu.d/luci-app-neto.json \
+		/usr/share/rpcd/acl.d/luci-app-neto.json \
+		/www/luci-static/resources/neto \
+		/www/luci-static/resources/neto_* \
+		/www/luci-static/resources/view/neto \
+		/www/luci-static/resources/view/neto_* \
+		/etc/neto \
+		/var/lib/neto \
+		/tmp/neto \
+		/tmp/neto-import.txt \
+		/tmp/neto-cron.* \
+		/tmp/neto-cron-lines.* \
+		/tmp/neto-install.* \
+		/tmp/neto-upgrade.* \
+		/tmp/neto-upgrade-archive.* \
+		/tmp/neto-upgrade-text.* \
+		/tmp/neto-archive-test.* \
+		/tmp/neto-go-cache \
+		/tmp/neto-test \
+		/tmp/dnsmasq.d/neto.conf \
+		/etc/dnsmasq.d/neto.conf
+	do
+		[ -e "$path" ] || [ -L "$path" ] || continue
+		return 0
+	done
+	if [ -f /etc/crontabs/root ] && grep -Eq \
+		'(^# neto subscriptions (begin|end)$|/usr/bin/netod([[:space:]]|$)|/etc/init\.d/neto([[:space:]]|$)|/usr/share/neto(/|[[:space:]]|$))' \
+		/etc/crontabs/root; then
+		return 0
+	fi
+	if command -v pidof >/dev/null 2>&1 && pidof netod >/dev/null 2>&1; then
+		return 0
+	fi
+	if command -v nft >/dev/null 2>&1 && nft list table inet neto >/dev/null 2>&1; then
+		return 0
+	fi
+	return 1
+}
+
+remove_legacy_neto_cron() {
+	local cron_file="/etc/crontabs/root"
+	local tmp="/tmp/zakop-legacy-cron.$$"
+
+	[ -f "$cron_file" ] || return 0
+	awk '
+		$0 == "# neto subscriptions begin" { skip = 1; next }
+		$0 == "# neto subscriptions end" { skip = 0; next }
+		!skip && $0 ~ /\/usr\/bin\/netod([[:space:]]|$)/ { next }
+		!skip && $0 ~ /\/etc\/init\.d\/neto([[:space:]]|$)/ { next }
+		!skip && $0 ~ /\/usr\/share\/neto(\/|[[:space:]]|$)/ { next }
+		!skip { print }
+	' "$cron_file" >"$tmp"
+	cat "$tmp" >"$cron_file"
+	rm -f "$tmp"
+}
+
+prepare_legacy_neto_migration() {
+	local old_managed="/usr/libexec/neto/sing-box"
+
+	[ "$LEGACY_NETO_INSTALL" -eq 1 ] || return 0
+	log "legacy neto installation detected; migrating it to zakop"
+
+	if [ -x /etc/init.d/neto ]; then
+		/etc/init.d/neto stop >/dev/null 2>&1 || true
+		/etc/init.d/neto disable >/dev/null 2>&1 || true
+	fi
+	if command -v killall >/dev/null 2>&1; then
+		killall netod >/dev/null 2>&1 || true
+	fi
+	if command -v nft >/dev/null 2>&1; then
+		nft delete table inet neto >/dev/null 2>&1 || true
+	fi
+	remove_legacy_neto_cron
+
+	mkdir -p "$WORK_DIR"
+	mkdir -p /etc/zakop
+	if [ -d /etc/neto ]; then
+		cp -R /etc/neto/. /etc/zakop/
+	fi
+	if [ -d /usr/share/neto ]; then
+		mkdir -p /usr/share/zakop
+		cp -R /usr/share/neto/. /usr/share/zakop/
+	fi
+	if [ -d /var/lib/neto/providers ]; then
+		mkdir -p /etc/zakop/provider-cache
+		cp -R /var/lib/neto/providers/. /etc/zakop/provider-cache/
+	fi
+	if [ ! -f /etc/config/zakop ] && [ -f /etc/config/neto ]; then
+		cp /etc/config/neto /etc/config/zakop
+	fi
+	if [ -f /etc/config/zakop ]; then
+		sed -i \
+			-e 's#/usr/libexec/neto/#/usr/libexec/zakop/#g' \
+			-e 's#/usr/share/neto/#/usr/share/zakop/#g' \
+			-e 's#/etc/neto/#/etc/zakop/#g' \
+			-e 's#/var/lib/neto/providers/#/etc/zakop/provider-cache/#g' \
+			/etc/config/zakop
+	fi
+
+	# Keep a compatible managed binary available as a last-resort source when
+	# neither the system package nor the new archive contains sing-box.
+	if singbox_compatible "$old_managed"; then
+		mkdir -p /usr/libexec/zakop
+		atomic_install "$old_managed" "$MANAGED_SINGBOX"
+	fi
+	log "legacy configuration and provider data prepared for zakop"
+}
+
+cleanup_legacy_neto_installation() {
+	local path
+
+	[ "$LEGACY_NETO_INSTALL" -eq 1 ] || return 0
+	if command -v killall >/dev/null 2>&1; then
+		killall netod >/dev/null 2>&1 || true
+	fi
+	if command -v nft >/dev/null 2>&1; then
+		nft delete table inet neto >/dev/null 2>&1 || true
+	fi
+	remove_legacy_neto_cron
+	rm -f /etc/init.d/neto /etc/rc.d/S*neto /etc/rc.d/K*neto /usr/bin/netod
+	rm -rf /usr/libexec/neto /usr/share/neto
+	rm -f /usr/share/luci/menu.d/luci-app-neto.json
+	rm -f /usr/share/rpcd/acl.d/luci-app-neto.json
+	for path in \
+		/www/luci-static/resources/neto \
+		/www/luci-static/resources/neto_* \
+		/www/luci-static/resources/view/neto \
+		/www/luci-static/resources/view/neto_*
+	do
+		if [ -e "$path" ] || [ -L "$path" ]; then
+			rm -rf "$path"
+		fi
+	done
+	rm -rf /tmp/neto /var/lib/neto /etc/neto
+	rm -f /etc/config/neto
+	rm -f /tmp/dnsmasq.d/neto.conf /etc/dnsmasq.d/neto.conf
+	rm -f \
+		/tmp/neto-import.txt \
+		/tmp/neto-cron.* \
+		/tmp/neto-cron-lines.* \
+		/tmp/neto-upgrade.* \
+		/tmp/neto-upgrade-archive.* \
+		/tmp/neto-upgrade-text.*
+	rm -rf \
+		/tmp/neto-install.* \
+		/tmp/neto-archive-test.* \
+		/tmp/neto-go-cache \
+		/tmp/neto-test
+	if [ -x /etc/init.d/cron ]; then
+		/etc/init.d/cron reload >/dev/null 2>&1 || /etc/init.d/cron restart >/dev/null 2>&1 || true
+	fi
+	if [ -x /etc/init.d/dnsmasq ]; then
+		/etc/init.d/dnsmasq reload >/dev/null 2>&1 || /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
+	fi
+	log "legacy neto files removed after successful zakop startup"
 }
 
 first_version() {
@@ -338,10 +507,10 @@ singbox_compatible() {
 set_fresh_singbox_path() {
 	local path="$1"
 	if command -v uci >/dev/null 2>&1; then
-		uci set neto.main.singbox_bin="$path"
-		uci commit neto
+		uci set zakop.main.singbox_bin="$path"
+		uci commit zakop
 	else
-		sed -i "s#option singbox_bin .*#option singbox_bin '$path'#" /etc/config/neto
+		sed -i "s#option singbox_bin .*#option singbox_bin '$path'#" /etc/config/zakop
 	fi
 }
 
@@ -455,7 +624,7 @@ choose_language() {
 		return 0
 	fi
 	if [ -t 0 ]; then
-		printf "neto install: install Russian LuCI localization? [y/N] "
+		printf "zakop install: install Russian LuCI localization? [y/N] "
 		read -r ans || ans=""
 		case "$ans" in
 			y|Y|yes|YES|Yes|д|Д|да|ДА|Да)
@@ -476,35 +645,35 @@ configure_language() {
 	case "$LANGUAGE_CHOICE" in
 		ru)
 			log "enabling Russian LuCI localization"
-			uci set neto.main.language='ru'
-			uci set neto.main.language_ru_installed='1'
+			uci set zakop.main.language='ru'
+			uci set zakop.main.language_ru_installed='1'
 			;;
 		*)
-			uci set neto.main.language='en'
-			uci set neto.main.language_ru_installed='0'
+			uci set zakop.main.language='en'
+			uci set zakop.main.language_ru_installed='0'
 			;;
 	esac
-	uci commit neto
+	uci commit zakop
 }
 
 fix_luci_permissions() {
 	local path
 
 	for path in \
-		/www/luci-static/resources/neto \
-		/www/luci-static/resources/neto_* \
-		/www/luci-static/resources/view/neto \
-		/www/luci-static/resources/view/neto_*
+		/www/luci-static/resources/zakop \
+		/www/luci-static/resources/zakop_* \
+		/www/luci-static/resources/view/zakop \
+		/www/luci-static/resources/view/zakop_*
 	do
 		[ -d "$path" ] && chmod 0755 "$path"
 	done
 	for path in \
-		/www/luci-static/resources/neto/*.js \
-		/www/luci-static/resources/neto_*/*.js \
-		/www/luci-static/resources/view/neto/*.js \
-		/www/luci-static/resources/view/neto_*/*.js \
-		/usr/share/luci/menu.d/luci-app-neto.json \
-		/usr/share/rpcd/acl.d/luci-app-neto.json
+		/www/luci-static/resources/zakop/*.js \
+		/www/luci-static/resources/zakop_*/*.js \
+		/www/luci-static/resources/view/zakop/*.js \
+		/www/luci-static/resources/view/zakop_*/*.js \
+		/usr/share/luci/menu.d/luci-app-zakop.json \
+		/usr/share/rpcd/acl.d/luci-app-zakop.json
 	do
 		[ -f "$path" ] && chmod 0644 "$path"
 	done
@@ -514,15 +683,15 @@ ensure_lan_subnet_config() {
 	local subnet
 
 	command -v uci >/dev/null 2>&1 || return 0
-	if uci -q get neto.main.lan_subnet >/dev/null 2>&1; then
+	if uci -q get zakop.main.lan_subnet >/dev/null 2>&1; then
 		return 0
 	fi
 
 	subnet="$(detect_lan_subnet)"
 	[ -n "$subnet" ] || subnet="192.168.8.0/24"
 	log "setting default lan_subnet $subnet"
-	uci add_list neto.main.lan_subnet="$subnet"
-	uci commit neto
+	uci add_list zakop.main.lan_subnet="$subnet"
+	uci commit zakop
 }
 
 install_files() {
@@ -530,41 +699,41 @@ install_files() {
 	local config_created=0
 	local path
 
-	[ -x "$WORK_DIR/bin/$arch/netod" ] || die "archive does not contain netod for $arch"
+	[ -x "$WORK_DIR/bin/$arch/zakopd" ] || die "archive does not contain zakopd for $arch"
 
-	mkdir -p /usr/bin /usr/share/neto /usr/libexec/neto /etc/config
-	atomic_install "$WORK_DIR/bin/$arch/netod" /usr/bin/netod
+	mkdir -p /usr/bin /usr/share/zakop /usr/libexec/zakop /etc/config
+	atomic_install "$WORK_DIR/bin/$arch/zakopd" /usr/bin/zakopd
 
-	if [ -f /etc/config/neto ]; then
-		rm -f "$WORK_DIR/files/etc/config/neto"
+	if [ -f /etc/config/zakop ]; then
+		rm -f "$WORK_DIR/files/etc/config/zakop"
 	else
 		config_created=1
 	fi
 
-	# Remove only neto-owned LuCI namespaces from previous releases. The archive
+	# Remove only zakop-owned LuCI namespaces from previous releases. The archive
 	# installs content-versioned paths so the browser requests fresh module URLs.
 	for path in \
-		/www/luci-static/resources/neto \
-		/www/luci-static/resources/neto_* \
-		/www/luci-static/resources/view/neto \
-		/www/luci-static/resources/view/neto_*
+		/www/luci-static/resources/zakop \
+		/www/luci-static/resources/zakop_* \
+		/www/luci-static/resources/view/zakop \
+		/www/luci-static/resources/view/zakop_*
 	do
 		[ -d "$path" ] && rm -rf "$path"
 	done
 	cp -R "$WORK_DIR/files/." /
 	fix_luci_permissions
-	chmod 0755 /etc/init.d/neto
-	[ -f /usr/share/neto/run-sing-box-log.sh ] && chmod 0755 /usr/share/neto/run-sing-box-log.sh
-	[ -f /usr/share/neto/check-version.sh ] && chmod 0755 /usr/share/neto/check-version.sh
-	if [ -d /usr/share/neto/providers ]; then
-		for script in /usr/share/neto/providers/*.sh; do
+	chmod 0755 /etc/init.d/zakop
+	[ -f /usr/share/zakop/run-sing-box-log.sh ] && chmod 0755 /usr/share/zakop/run-sing-box-log.sh
+	[ -f /usr/share/zakop/check-version.sh ] && chmod 0755 /usr/share/zakop/check-version.sh
+	if [ -d /usr/share/zakop/providers ]; then
+		for script in /usr/share/zakop/providers/*.sh; do
 			[ -f "$script" ] && chmod 0755 "$script"
 		done
 	fi
 
-	atomic_install "$WORK_DIR/install.sh" /usr/share/neto/install.sh
-	atomic_install "$WORK_DIR/uninstall.sh" /usr/share/neto/uninstall.sh
-	atomic_install "$WORK_DIR/upgrade.sh" /usr/share/neto/upgrade.sh
+	atomic_install "$WORK_DIR/install.sh" /usr/share/zakop/install.sh
+	atomic_install "$WORK_DIR/uninstall.sh" /usr/share/zakop/uninstall.sh
+	atomic_install "$WORK_DIR/upgrade.sh" /usr/share/zakop/upgrade.sh
 
 	if singbox_compatible /usr/bin/sing-box; then
 		log "using compatible system sing-box"
@@ -580,6 +749,8 @@ install_files() {
 		if [ "$config_created" -eq 1 ]; then
 			set_fresh_singbox_path "$MANAGED_SINGBOX"
 		fi
+	elif singbox_compatible "$MANAGED_SINGBOX"; then
+		log "using migrated managed sing-box"
 	else
 		die "no compatible system sing-box and no managed sing-box for $arch in archive"
 	fi
@@ -589,35 +760,35 @@ install_files() {
 }
 
 verify_installed_version() {
-	local expected="${NETO_EXPECT_VERSION:-}"
+	local expected="${ZAKOP_EXPECT_VERSION:-}"
 	local archive_expected=""
 	local actual=""
 
-	if [ -f "$WORK_DIR/neto-version.txt" ]; then
-		archive_expected="$(sed -n '1{s/[[:space:]]//g;p;}' "$WORK_DIR/neto-version.txt")"
+	if [ -f "$WORK_DIR/zakop-version.txt" ]; then
+		archive_expected="$(sed -n '1{s/[[:space:]]//g;p;}' "$WORK_DIR/zakop-version.txt")"
 	fi
 	if [ -n "$expected" ] && [ -n "$archive_expected" ] && [ "$expected" != "$archive_expected" ]; then
 		die "downloaded archive version $archive_expected does not match requested $expected"
 	fi
 	[ -n "$expected" ] || expected="$archive_expected"
-	actual="$(/usr/bin/netod version 2>/dev/null | awk '{ print $2; exit }')"
-	[ -n "$actual" ] || die "installed netod cannot report its version"
+	actual="$(/usr/bin/zakopd version 2>/dev/null | awk '{ print $2; exit }')"
+	[ -n "$actual" ] || die "installed zakopd cannot report its version"
 	if [ -n "$expected" ] && [ "$actual" != "$expected" ]; then
-		die "installed netod version $actual does not match expected $expected"
+		die "installed zakopd version $actual does not match expected $expected"
 	fi
-	log "verified netod $actual"
+	log "verified zakopd $actual"
 }
 
-neto_service_pids() {
+zakop_service_pids() {
 	command -v ubus >/dev/null 2>&1 || return 0
-	ubus call service list '{"name":"neto"}' 2>/dev/null |
+	ubus call service list '{"name":"zakop"}' 2>/dev/null |
 		sed -n 's/^[[:space:]]*"pid":[[:space:]]*\([0-9][0-9]*\),*$/\1/p'
 }
 
-neto_runtime_ready() {
+zakop_runtime_ready() {
 	local status expected
 
-	status="$(/usr/bin/netod status 2>/dev/null || true)"
+	status="$(/usr/bin/zakopd status 2>/dev/null || true)"
 	for expected in \
 		"nft_table: present" \
 		"ip_rule: present" \
@@ -633,11 +804,11 @@ neto_runtime_ready() {
 	return 0
 }
 
-restart_neto_safely() {
+restart_zakop_safely() {
 	local old_pids="" pid="" alive=0 attempts=0 enabled="1"
 
-	old_pids="$(neto_service_pids || true)"
-	/etc/init.d/neto stop >/dev/null 2>&1 || true
+	old_pids="$(zakop_service_pids || true)"
+	/etc/init.d/zakop stop >/dev/null 2>&1 || true
 
 	if [ -n "$old_pids" ]; then
 		while [ "$attempts" -lt 10 ]; do
@@ -652,23 +823,23 @@ restart_neto_safely() {
 			attempts=$((attempts + 1))
 			sleep 1
 		done
-		[ "$alive" -eq 0 ] || die "old neto processes did not stop; networking was returned to direct mode"
+		[ "$alive" -eq 0 ] || die "old zakop processes did not stop; networking was returned to direct mode"
 	else
 		# Older procd versions may omit instance PIDs from the service response.
 		sleep 2
 	fi
 
-	if ! /etc/init.d/neto start; then
-		/etc/init.d/neto stop >/dev/null 2>&1 || true
+	if ! /etc/init.d/zakop start; then
+		/etc/init.d/zakop stop >/dev/null 2>&1 || true
 		die "service failed to start after update; networking was returned to direct mode"
 	fi
-	enabled="$(uci -q get neto.main.enabled 2>/dev/null || true)"
+	enabled="$(uci -q get zakop.main.enabled 2>/dev/null || true)"
 	[ -n "$enabled" ] || enabled="1"
 	[ "$enabled" = "1" ] || return 0
 
 	attempts=0
 	while [ "$attempts" -lt 15 ]; do
-		if /etc/init.d/neto running >/dev/null 2>&1 && neto_runtime_ready; then
+		if /etc/init.d/zakop running >/dev/null 2>&1 && zakop_runtime_ready; then
 			log "service restart verified"
 			return 0
 		fi
@@ -676,7 +847,7 @@ restart_neto_safely() {
 		sleep 1
 	done
 
-	/etc/init.d/neto stop >/dev/null 2>&1 || true
+	/etc/init.d/zakop stop >/dev/null 2>&1 || true
 	die "service did not become ready after update; networking was returned to direct mode"
 }
 
@@ -721,8 +892,14 @@ pm="$(detect_pkg_manager)"
 arch="$(detect_arch)"
 log "detected $(distro_id) $ver, package manager $pm, arch $arch"
 
-if [ -x /usr/bin/netod ] && [ -x /etc/init.d/neto ] && [ -f /etc/config/neto ]; then
+if [ -x /usr/bin/zakopd ] && [ -x /etc/init.d/zakop ] && [ -f /etc/config/zakop ]; then
 	EXISTING_INSTALL=1
+fi
+if legacy_neto_detected; then
+	LEGACY_NETO_INSTALL=1
+	if [ -x /usr/bin/netod ] && [ -x /etc/init.d/neto ] && [ -f /etc/config/neto ]; then
+		EXISTING_INSTALL=1
+	fi
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -738,7 +915,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
 	else
 		dry_log "would ask whether to enable Russian LuCI localization when interactive"
 	fi
-	dry_log "would install netod for $arch and configure dnsmasq/init/LuCI"
+	dry_log "would install zakopd for $arch and configure dnsmasq/init/LuCI"
+	[ "$LEGACY_NETO_INSTALL" -eq 0 ] || dry_log "would migrate the legacy neto config and provider data, then remove old runtime files after startup verification"
 	exit 0
 fi
 
@@ -757,6 +935,7 @@ else
 	log "existing installation detected; preserving config and skipping package installation"
 fi
 check_runtime_curl
+prepare_legacy_neto_migration
 
 need_cmd tar
 mkdir -p "$WORK_DIR"
@@ -767,8 +946,8 @@ else
 	download "$BASE_URL/$ARCHIVE_NAME" "$WORK_DIR/$ARCHIVE_NAME"
 fi
 tar -xzf "$WORK_DIR/$ARCHIVE_NAME" -C "$WORK_DIR"
-if [ -d "$WORK_DIR/neto" ]; then
-	WORK_DIR="$WORK_DIR/neto"
+if [ -d "$WORK_DIR/zakop" ]; then
+	WORK_DIR="$WORK_DIR/zakop"
 fi
 
 command -v fw4 >/dev/null 2>&1 || die "firewall4/fw4 is required"
@@ -778,8 +957,8 @@ command -v ip >/dev/null 2>&1 || die "ip-full is required"
 install_files "$arch"
 verify_installed_version
 
-/etc/init.d/neto enable
-restart_neto_safely
+/etc/init.d/zakop enable
+restart_zakop_safely
 if [ "$EXISTING_INSTALL" -eq 1 ]; then
 	# The first start replaces the procd instance definitions that were loaded
 	# from the previous release. A second clean cycle is intentional: it runs
@@ -787,8 +966,9 @@ if [ "$EXISTING_INSTALL" -eq 1 ]; then
 	# matches the manual restart required by older self-updates.
 	log "performing final clean service restart after update"
 	sleep 2
-	restart_neto_safely
+	restart_zakop_safely
 fi
+cleanup_legacy_neto_installation
 
 clear_luci_cache
 log "installed"

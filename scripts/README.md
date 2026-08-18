@@ -5,9 +5,9 @@
 Основные команды:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```
 
 `test-archive.sh` проверяет, что embedded archive содержит top-level directory
-`neto/`, installer/uninstaller, LuCI files и binaries layout.
+`zakop/`, installer/uninstaller, LuCI files и binaries layout.

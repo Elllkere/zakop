@@ -7,7 +7,7 @@ import (
 )
 
 func TestOutboundsLuCIContainsImportAndSubscriptions(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,24 +24,24 @@ func TestOutboundsLuCIContainsImportAndSubscriptions(t *testing.T) {
 		"status.style.display = 'none';",
 		"handleManualImport: function(value)",
 		"fs.write(importPath",
-		"fs.exec('/usr/bin/netod', [ 'import-uri', '-file', importPath ])",
+		"fs.exec('/usr/bin/zakopd', [ 'import-uri', '-file', importPath ])",
 		"el.appendChild(E('button'",
 		"}, _('Import')))",
 		"form.GridSection, 'subscription', _('Subscriptions')",
 		"handleSubscriptionUpdate: function(section_id)",
 		"handleSaveCommitConfig: function()",
 		"return this.handleSaveCommitConfig()",
-		"fs.exec('/sbin/uci', [ 'commit', 'neto' ])",
+		"fs.exec('/sbin/uci', [ 'commit', 'zakop' ])",
 		"throw new Error(res.stderr || res.stdout || _('Commit failed'))",
-		"fs.exec('/usr/bin/netod', [ 'subscriptions', 'update', section_id ])",
+		"fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update', section_id ])",
 		"handleSubscriptionUpdateAll: function()",
 		"runSubscriptionUpdates: function(names)",
 		"setSubscriptionUpdateAllButton: function(running, current, total)",
-		"fs.exec('/usr/bin/netod', [ 'subscriptions', 'update', name ])",
+		"fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update', name ])",
 		"failures.push({ name: name, error:",
 		"showSubscriptionUpdateFailures: function(failures)",
 		"Updating %d/%d…",
-		"'data-neto-subscriptions-update-all': '1'",
+		"'data-zakop-subscriptions-update-all': '1'",
 		"_('Updating all…')",
 		"_('Update all')",
 		"form.Value, 'url'",
@@ -69,10 +69,10 @@ func TestOutboundsLuCIContainsImportAndSubscriptions(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"form.GridSection, 'outbound', _('Subscription nodes')",
-		"uci.get('neto', section_id, 'subscription') != null",
-		"uci.get('neto', section_id, 'subscription') == null",
+		"uci.get('zakop', section_id, 'subscription') != null",
+		"uci.get('zakop', section_id, 'subscription') == null",
 		"uci.commit(",
-		"fs.exec('/usr/bin/netod', [ 'subscriptions', 'update' ])",
+		"fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update' ])",
 	} {
 		if strings.Contains(s, forbidden) {
 			t.Fatalf("subscription nodes must remain editable in the regular Outbounds table, found %q:\n%s", forbidden, s)
@@ -91,7 +91,7 @@ func TestOutboundsLuCIContainsImportAndSubscriptions(t *testing.T) {
 }
 
 func TestOutboundsLuCIShowsSubscriptionUpdatedInTable(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestOutboundsLuCIShowsSubscriptionUpdatedInTable(t *testing.T) {
 }
 
 func TestOutboundsLuCISubscriptionUpdateButtonIsModalOnly(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/outbounds.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,23 +139,23 @@ func TestOutboundsLuCISubscriptionUpdateButtonIsModalOnly(t *testing.T) {
 }
 
 func TestNoSeparateImportsLuCIMenu(t *testing.T) {
-	menu, err := os.ReadFile("../../embedded/files/usr/share/luci/menu.d/luci-app-neto.json")
+	menu, err := os.ReadFile("../../embedded/files/usr/share/luci/menu.d/luci-app-zakop.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(menu), `"admin/services/neto/imports"`) || strings.Contains(string(menu), `"path": "neto/imports"`) {
+	if strings.Contains(string(menu), `"admin/services/zakop/imports"`) || strings.Contains(string(menu), `"path": "zakop/imports"`) {
 		t.Fatalf("imports must be integrated into Outbounds, not a separate menu page:\n%s", menu)
 	}
 
-	acl, err := os.ReadFile("../../embedded/files/usr/share/rpcd/acl.d/luci-app-neto.json")
+	acl, err := os.ReadFile("../../embedded/files/usr/share/rpcd/acl.d/luci-app-zakop.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		`"/tmp/neto-import.txt": [ "read", "write" ]`,
+		`"/tmp/zakop-import.txt": [ "read", "write" ]`,
 		`"/sbin/uci": [ "exec" ]`,
-		`"/usr/bin/netod": [ "exec" ]`,
-		`"/etc/init.d/neto": [ "exec" ]`,
+		`"/usr/bin/zakopd": [ "exec" ]`,
+		`"/etc/init.d/zakop": [ "exec" ]`,
 	} {
 		if !strings.Contains(string(acl), want) {
 			t.Fatalf("ACL missing %q:\n%s", want, acl)

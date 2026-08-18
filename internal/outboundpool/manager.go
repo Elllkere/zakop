@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 type API interface {

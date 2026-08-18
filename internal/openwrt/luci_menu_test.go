@@ -7,73 +7,73 @@ import (
 )
 
 func TestLuCIMenuOrderAndDebugPage(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/usr/share/luci/menu.d/luci-app-neto.json")
+	data, err := os.ReadFile("../../embedded/files/usr/share/luci/menu.d/luci-app-zakop.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
-		`"admin/services/neto/general"`,
+		`"admin/services/zakop/general"`,
 		`"title": "General"`,
 		`"order": 10`,
-		`"admin/services/neto/rules"`,
+		`"admin/services/zakop/rules"`,
 		`"title": "Rules"`,
 		`"order": 30`,
-		`"admin/services/neto/clients"`,
+		`"admin/services/zakop/clients"`,
 		`"title": "Clients"`,
 		`"order": 40`,
-		`"admin/services/neto/outbounds"`,
+		`"admin/services/zakop/outbounds"`,
 		`"title": "Outbounds"`,
 		`"order": 20`,
-		`"admin/services/neto/advanced"`,
+		`"admin/services/zakop/advanced"`,
 		`"title": "Advanced"`,
-		`"path": "neto/advanced"`,
-		`"admin/services/neto/logs"`,
+		`"path": "zakop/advanced"`,
+		`"admin/services/zakop/logs"`,
 		`"title": "Logs"`,
 		`"order": 80`,
-		`"path": "neto/logs"`,
-		`"admin/services/neto/debug"`,
+		`"path": "zakop/logs"`,
+		`"admin/services/zakop/debug"`,
 		`"title": "Debug"`,
 		`"order": 90`,
-		`"path": "neto/debug"`,
+		`"path": "zakop/debug"`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("menu missing %q:\n%s", want, s)
 		}
 	}
 	for _, forbidden := range []string{
-		`"admin/services/neto/overview"`,
+		`"admin/services/zakop/overview"`,
 		`"title": "Overview"`,
-		`"path": "neto/overview"`,
+		`"path": "zakop/overview"`,
 	} {
 		if strings.Contains(s, forbidden) {
 			t.Fatalf("overview menu entry should be replaced by Debug, found %q:\n%s", forbidden, s)
 		}
 	}
 
-	if _, err := os.Stat("../../embedded/files/www/luci-static/resources/view/neto/debug.js"); err != nil {
+	if _, err := os.Stat("../../embedded/files/www/luci-static/resources/view/zakop/debug.js"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat("../../embedded/files/www/luci-static/resources/view/neto/logs.js"); err != nil {
+	if _, err := os.Stat("../../embedded/files/www/luci-static/resources/view/zakop/logs.js"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat("../../embedded/files/www/luci-static/resources/view/neto/overview.js"); !os.IsNotExist(err) {
+	if _, err := os.Stat("../../embedded/files/www/luci-static/resources/view/zakop/overview.js"); !os.IsNotExist(err) {
 		t.Fatalf("overview.js should be removed, stat err=%v", err)
 	}
 }
 
 func TestLuCIACLAllowsStatusAndVersionCommands(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/usr/share/rpcd/acl.d/luci-app-neto.json")
+	data, err := os.ReadFile("../../embedded/files/usr/share/rpcd/acl.d/luci-app-zakop.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
 		`"/bin/pidof": [ "exec" ]`,
-		`"/etc/init.d/neto": [ "exec" ]`,
-		`"/usr/bin/netod": [ "exec" ]`,
+		`"/etc/init.d/zakop": [ "exec" ]`,
+		`"/usr/bin/zakopd": [ "exec" ]`,
 		`"/usr/bin/sing-box": [ "exec" ]`,
-		`"/usr/libexec/neto/sing-box": [ "exec" ]`,
+		`"/usr/libexec/zakop/sing-box": [ "exec" ]`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("ACL missing %q:\n%s", want, s)
@@ -82,7 +82,7 @@ func TestLuCIACLAllowsStatusAndVersionCommands(t *testing.T) {
 }
 
 func TestLuCIHidesRulesTabOutsideCustomMode(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/neto/ui.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/zakop/ui.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,13 +91,13 @@ func TestLuCIHidesRulesTabOutsideCustomMode(t *testing.T) {
 		"routing_mode",
 		"rulesTabVisible()",
 		"document.querySelectorAll('a[href]')",
-		"/admin/services/neto/rules",
-		"/neto/rules",
+		"/admin/services/zakop/rules",
+		"/zakop/rules",
 		"hideElement(tabContainer(links[i]), hidden)",
 		"syncRulesTab: syncRulesTab",
 	} {
 		if !strings.Contains(s, want) {
-			t.Fatalf("neto/ui.js missing rules tab visibility behavior %q:\n%s", want, s)
+			t.Fatalf("zakop/ui.js missing rules tab visibility behavior %q:\n%s", want, s)
 		}
 	}
 
@@ -111,11 +111,11 @@ func TestLuCIHidesRulesTabOutsideCustomMode(t *testing.T) {
 		"providers.js",
 		"rules.js",
 	} {
-		view, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/" + path)
+		view, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/" + path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(view), "'require neto.ui as netoUI'") || !strings.Contains(string(view), "netoUI.syncRulesTab()") {
+		if !strings.Contains(string(view), "'require zakop.ui as zakopUI'") || !strings.Contains(string(view), "zakopUI.syncRulesTab()") {
 			t.Fatalf("%s must sync Rules tab visibility:\n%s", path, string(view))
 		}
 	}

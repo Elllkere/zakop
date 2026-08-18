@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func testQuery(qtype uint16) []byte {

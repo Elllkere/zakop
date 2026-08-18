@@ -2,18 +2,18 @@
 
 set -eu
 
-INSTALL_URL="${NETO_INSTALL_URL:-https://raw.githubusercontent.com/elllkere/neto/main/embedded/install.sh}"
-VERSION_URL="${NETO_VERSION_URL:-https://github.com/elllkere/neto/releases/latest/download/neto-version.txt}"
-RELEASE_API_URL="${NETO_RELEASE_API_URL:-https://api.github.com/repos/elllkere/neto/releases/latest}"
-ARCHIVE_URL="${NETO_ARCHIVE_URL:-https://github.com/elllkere/neto/releases/latest/download/neto-openwrt-embedded.tar.gz}"
-NETOD_BIN="${NETO_NETOD_BIN:-/usr/bin/netod}"
-TMP="${TMPDIR:-/tmp}/neto-upgrade.$$"
-ARCHIVE_TMP="${TMPDIR:-/tmp}/neto-upgrade-archive.$$"
-TEXT_TMP="${TMPDIR:-/tmp}/neto-upgrade-text.$$"
-UPGRADE_LOG="${NETO_UPGRADE_LOG:-/tmp/neto/upgrade.log}"
+INSTALL_URL="${ZAKOP_INSTALL_URL:-https://raw.githubusercontent.com/elllkere/zakop/main/embedded/install.sh}"
+VERSION_URL="${ZAKOP_VERSION_URL:-https://github.com/elllkere/zakop/releases/latest/download/zakop-version.txt}"
+RELEASE_API_URL="${ZAKOP_RELEASE_API_URL:-https://api.github.com/repos/elllkere/zakop/releases/latest}"
+ARCHIVE_URL="${ZAKOP_ARCHIVE_URL:-https://github.com/elllkere/zakop/releases/latest/download/zakop-openwrt-embedded.tar.gz}"
+ZAKOPD_BIN="${ZAKOP_ZAKOPD_BIN:-/usr/bin/zakopd}"
+TMP="${TMPDIR:-/tmp}/zakop-upgrade.$$"
+ARCHIVE_TMP="${TMPDIR:-/tmp}/zakop-upgrade-archive.$$"
+TEXT_TMP="${TMPDIR:-/tmp}/zakop-upgrade-text.$$"
+UPGRADE_LOG="${ZAKOP_UPGRADE_LOG:-/tmp/zakop/upgrade.log}"
 MODE="upgrade"
-UPDATE_VIA="${NETO_UPDATE_VIA:-}"
-UPDATE_OUTBOUND="${NETO_UPDATE_OUTBOUND:-}"
+UPDATE_VIA="${ZAKOP_UPDATE_VIA:-}"
+UPDATE_OUTBOUND="${ZAKOP_UPDATE_OUTBOUND:-}"
 
 usage() {
 	echo "usage: upgrade.sh [--check|--luci]" >&2
@@ -39,16 +39,16 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [ -z "$UPDATE_VIA" ] && command -v uci >/dev/null 2>&1; then
-	UPDATE_VIA="$(uci -q get neto.main.update_via 2>/dev/null || true)"
+	UPDATE_VIA="$(uci -q get zakop.main.update_via 2>/dev/null || true)"
 fi
 [ -n "$UPDATE_VIA" ] || UPDATE_VIA="direct"
 if [ -z "$UPDATE_OUTBOUND" ] && command -v uci >/dev/null 2>&1; then
-	UPDATE_OUTBOUND="$(uci -q get neto.main.update_outbound 2>/dev/null || true)"
+	UPDATE_OUTBOUND="$(uci -q get zakop.main.update_outbound 2>/dev/null || true)"
 fi
 case "$UPDATE_VIA" in
 	direct|proxy) ;;
 	*)
-		echo "neto upgrade: unsupported update_via $UPDATE_VIA" >&2
+		echo "zakop upgrade: unsupported update_via $UPDATE_VIA" >&2
 		exit 1
 		;;
 esac
@@ -63,9 +63,9 @@ download_text() {
 	if [ "$UPDATE_VIA" = "proxy" ]; then
 		rm -f "$TEXT_TMP" "$TEXT_TMP.tmp"
 		if [ -n "$UPDATE_OUTBOUND" ]; then
-			"$NETOD_BIN" download -url "$url" -output "$TEXT_TMP" -via proxy -outbound "$UPDATE_OUTBOUND" >/dev/null 2>&1 || return 1
+			"$ZAKOPD_BIN" download -url "$url" -output "$TEXT_TMP" -via proxy -outbound "$UPDATE_OUTBOUND" >/dev/null 2>&1 || return 1
 		else
-			"$NETOD_BIN" download -url "$url" -output "$TEXT_TMP" -via proxy >/dev/null 2>&1 || return 1
+			"$ZAKOPD_BIN" download -url "$url" -output "$TEXT_TMP" -via proxy >/dev/null 2>&1 || return 1
 		fi
 		cat "$TEXT_TMP"
 		rm -f "$TEXT_TMP"
@@ -99,7 +99,7 @@ latest_version() {
 }
 
 normalize_version() {
-	printf '%s\n' "$1" | sed 's/^netod[[:space:]]*//; s/^v//; s/[-+].*$//'
+	printf '%s\n' "$1" | sed 's/^zakopd[[:space:]]*//; s/^v//; s/[-+].*$//'
 }
 
 release_version() {
@@ -127,10 +127,10 @@ check_version() {
 	local latest_normalized=""
 	local status="available"
 
-	current="$("$NETOD_BIN" version 2>/dev/null | awk '{ print $2; exit }')"
+	current="$("$ZAKOPD_BIN" version 2>/dev/null | awk '{ print $2; exit }')"
 	[ -n "$current" ] || current="unknown"
 	latest="$(latest_version)" || {
-		echo "neto upgrade: failed to query the latest release" >&2
+		echo "zakop upgrade: failed to query the latest release" >&2
 		exit 1
 	}
 
@@ -156,11 +156,11 @@ download() {
 	rm -f "$tmp"
 	if [ "$UPDATE_VIA" = "proxy" ]; then
 		if [ -n "$UPDATE_OUTBOUND" ]; then
-			"$NETOD_BIN" download -url "$url" -output "$dest" -via proxy -outbound "$UPDATE_OUTBOUND" && return 0
+			"$ZAKOPD_BIN" download -url "$url" -output "$dest" -via proxy -outbound "$UPDATE_OUTBOUND" && return 0
 		else
-			"$NETOD_BIN" download -url "$url" -output "$dest" -via proxy && return 0
+			"$ZAKOPD_BIN" download -url "$url" -output "$dest" -via proxy && return 0
 		fi
-		echo "neto upgrade: failed to download $url through outbound ${UPDATE_OUTBOUND:-missing}" >&2
+		echo "zakop upgrade: failed to download $url through outbound ${UPDATE_OUTBOUND:-missing}" >&2
 		exit 1
 	fi
 	if curl_usable; then
@@ -182,7 +182,7 @@ download() {
 		rm -f "$tmp"
 	fi
 
-	echo "neto upgrade: failed to download $url; attempted:${attempts:- none}" >&2
+	echo "zakop upgrade: failed to download $url; attempted:${attempts:- none}" >&2
 	exit 1
 }
 
@@ -196,26 +196,26 @@ run_upgrade() {
 	local actual=""
 
 	expected="$(latest_version)" || {
-		echo "neto upgrade: failed to query the release version before installation" >&2
+		echo "zakop upgrade: failed to query the release version before installation" >&2
 		return 1
 	}
 	download "$INSTALL_URL" "$TMP"
 	if [ "$UPDATE_VIA" = "proxy" ]; then
 		download "$ARCHIVE_URL" "$ARCHIVE_TMP"
-		if ! NETO_EXPECT_VERSION="$expected" sh "$TMP" --local "$ARCHIVE_TMP"; then
-			echo "neto upgrade: installer failed; netod was not updated" >&2
+		if ! ZAKOP_EXPECT_VERSION="$expected" sh "$TMP" --local "$ARCHIVE_TMP"; then
+			echo "zakop upgrade: installer failed; zakopd was not updated" >&2
 			return 1
 		fi
-	elif ! NETO_EXPECT_VERSION="$expected" sh "$TMP"; then
-		echo "neto upgrade: installer failed; netod was not updated" >&2
+	elif ! ZAKOP_EXPECT_VERSION="$expected" sh "$TMP"; then
+		echo "zakop upgrade: installer failed; zakopd was not updated" >&2
 		return 1
 	fi
-	actual="$("$NETOD_BIN" version 2>/dev/null | awk '{ print $2; exit }')"
+	actual="$("$ZAKOPD_BIN" version 2>/dev/null | awk '{ print $2; exit }')"
 	if [ "$actual" != "$expected" ]; then
-		echo "neto upgrade: installed version $actual does not match expected $expected" >&2
+		echo "zakop upgrade: installed version $actual does not match expected $expected" >&2
 		return 1
 	fi
-	echo "neto upgrade: verified installed version $actual"
+	echo "zakop upgrade: verified installed version $actual"
 }
 
 if [ "$MODE" = "luci" ]; then

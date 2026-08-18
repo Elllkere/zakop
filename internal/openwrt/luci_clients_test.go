@@ -7,12 +7,12 @@ import (
 )
 
 func TestClientsLuCIPolicyHelpIsSectionDescription(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/clients.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/clients.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
-	help := "Default follows general routing mode. Proxy forces non-reserved traffic through neto. Direct bypasses neto completely."
+	help := "Default follows general routing mode. Proxy forces non-reserved traffic through zakop. Direct bypasses zakop completely."
 
 	if !strings.Contains(s, "form.GridSection, 'client', _('Clients'),") || !strings.Contains(s, "_('"+help+"')") {
 		t.Fatalf("clients policy help should be on the Clients section like Rules help:\n%s", s)
@@ -23,14 +23,14 @@ func TestClientsLuCIPolicyHelpIsSectionDescription(t *testing.T) {
 }
 
 func TestClientsLuCIProxyPolicyCanSelectOutbound(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/clients.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/clients.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
 		"function addOutboundChoices(option)",
-		"uci.sections('neto', 'outbound'",
+		"uci.sections('zakop', 'outbound'",
 		"tag == 'direct' || tag == 'blocked' || tag == 'block' || tag == 'proxy_default'",
 		"form.ListValue, 'outbound', _('Outbound')",
 		"o.depends('policy', 'proxy')",
@@ -39,7 +39,7 @@ func TestClientsLuCIProxyPolicyCanSelectOutbound(t *testing.T) {
 		"o.forcewrite = true",
 		"function rewriteClientState()",
 		"this.map.save(rewriteClientState)",
-		"uci.unset('neto', sid, 'outbound')",
+		"uci.unset('zakop', sid, 'outbound')",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("clients.js missing proxy outbound UI behavior %q:\n%s", want, s)

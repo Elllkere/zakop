@@ -25,7 +25,7 @@ EC2
 GLOBALACCELERATOR
 "
 
-WORK_DIR="${TMPDIR:-/tmp}/neto-aws-full-ipv4.$$"
+WORK_DIR="${TMPDIR:-/tmp}/zakop-aws-full-ipv4.$$"
 JSON_FILE="$WORK_DIR/ip-ranges.json"
 RESULT_FILE="$WORK_DIR/result.txt"
 
@@ -37,8 +37,8 @@ trap cleanup EXIT INT TERM
 fetch_url() {
 	url="$1"
 
-	if [ -n "${NETO_PROVIDER_PROXY:-}" ]; then
-		curl -fsSL --connect-timeout 15 --max-time 60 --proxy "$NETO_PROVIDER_PROXY" "$url"
+	if [ -n "${ZAKOP_PROVIDER_PROXY:-}" ]; then
+		curl -fsSL --connect-timeout 15 --max-time 60 --proxy "$ZAKOP_PROVIDER_PROXY" "$url"
 	else
 		curl -fsSL --connect-timeout 15 --max-time 60 --noproxy "*" "$url"
 	fi
@@ -108,18 +108,18 @@ extract_aws_prefixes() {
 
 mkdir -p "$WORK_DIR"
 
-echo "neto: fetching AWS Full IPv4 ranges (AMAZON, EC2, GLOBALACCELERATOR)" >&2
-echo "neto: warning: routing AWS Full may affect ping to games hosted on Amazon/AWS servers" >&2
+echo "zakop: fetching AWS Full IPv4 ranges (AMAZON, EC2, GLOBALACCELERATOR)" >&2
+echo "zakop: warning: routing AWS Full may affect ping to games hosted on Amazon/AWS servers" >&2
 fetch_url "$AWS_IP_RANGES_URL" > "$JSON_FILE"
 extract_aws_prefixes < "$JSON_FILE" | sort -u > "$RESULT_FILE"
 
 if [ ! -s "$RESULT_FILE" ]; then
-	echo "neto: AWS Full IPv4 provider returned an empty list" >&2
+	echo "zakop: AWS Full IPv4 provider returned an empty list" >&2
 	exit 1
 fi
 
-if [ -n "${NETO_PROVIDER_OUTPUT:-}" ]; then
-	cp "$RESULT_FILE" "$NETO_PROVIDER_OUTPUT"
+if [ -n "${ZAKOP_PROVIDER_OUTPUT:-}" ]; then
+	cp "$RESULT_FILE" "$ZAKOP_PROVIDER_OUTPUT"
 else
 	cat "$RESULT_FILE"
 fi

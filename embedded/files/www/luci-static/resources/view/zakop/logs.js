@@ -3,13 +3,13 @@
 'require ui';
 'require uci';
 'require view';
-'require neto.i18n as netoI18n';
-'require neto.ui as netoUI';
+'require zakop.i18n as zakopI18n';
+'require zakop.ui as zakopUI';
 
-var _ = netoI18n.translate;
+var _ = zakopI18n.translate;
 
-function netod(args) {
-	return fs.exec('/usr/bin/netod', args).then(function(res) {
+function zakopd(args) {
+	return fs.exec('/usr/bin/zakopd', args).then(function(res) {
 		if (res.code)
 			throw new Error(res.stderr || res.stdout || _('Command failed'));
 
@@ -24,17 +24,17 @@ function displayLog(text) {
 
 return view.extend({
 	load: function() {
-		return uci.load('neto').then(function() {
-			netoUI.syncRulesTab();
+		return uci.load('zakop').then(function() {
+			zakopUI.syncRulesTab();
 
-			return netod([ 'logs', 'sing-box' ]).catch(function(err) {
+			return zakopd([ 'logs', 'sing-box' ]).catch(function(err) {
 				return err.message || String(err);
 			});
 		});
 	},
 
 	handleRefresh: function() {
-		return netod([ 'logs', 'sing-box' ])
+		return zakopd([ 'logs', 'sing-box' ])
 			.then(L.bind(function(text) {
 				this.logNode.textContent = displayLog(text);
 			}, this))
@@ -45,7 +45,7 @@ return view.extend({
 
 	handleClear: function(button) {
 		button.disabled = true;
-		return fs.exec('/usr/bin/netod', [ 'logs', 'sing-box', 'clear' ])
+		return fs.exec('/usr/bin/zakopd', [ 'logs', 'sing-box', 'clear' ])
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Clear failed'));
@@ -63,7 +63,7 @@ return view.extend({
 	render: function(logText) {
 		var refreshButton, clearButton;
 
-		netoUI.syncRulesTab();
+		zakopUI.syncRulesTab();
 
 		refreshButton = E('button', {
 			'class': 'cbi-button cbi-button-action',

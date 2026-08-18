@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 type ApplyOptions struct {

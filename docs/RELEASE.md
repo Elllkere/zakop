@@ -1,8 +1,8 @@
 # Release Process
 
-Этот документ описывает, как выпускать новый GitHub Release для `neto`.
+Этот документ описывает, как выпускать новый GitHub Release для `zakop`.
 
-Версия `netod` не хранится в отдельном Go файле. При сборке archive
+Версия `zakopd` не хранится в отдельном Go файле. При сборке archive
 `embedded/pack.sh` берет version из git tag через:
 
 ```sh
@@ -56,29 +56,29 @@ git describe --tags --always --dirty
 ## 3. Build Archive
 
 ```sh
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```
 
 Archive будет здесь:
 
 ```text
-dist/neto-openwrt-embedded.tar.gz
+dist/zakop-openwrt-embedded.tar.gz
 ```
 
 Проверить version внутри binary:
 
 ```sh
 tmp="$(mktemp -d)"
-tar -xzf dist/neto-openwrt-embedded.tar.gz -C "$tmp"
-"$tmp/neto/bin/linux-amd64/netod" version
+tar -xzf dist/zakop-openwrt-embedded.tar.gz -C "$tmp"
+"$tmp/zakop/bin/linux-amd64/zakopd" version
 rm -rf "$tmp"
 ```
 
 Expected:
 
 ```text
-netod vX.Y.Z
+zakopd vX.Y.Z
 ```
 
 ## 4. Push To GitHub
@@ -106,7 +106,7 @@ git push origin --tags
 6. Upload asset:
 
 ```text
-neto-openwrt-embedded.tar.gz
+zakop-openwrt-embedded.tar.gz
 ```
 
 7. Publish release.
@@ -114,13 +114,13 @@ neto-openwrt-embedded.tar.gz
 Installer downloads archive from:
 
 ```text
-https://github.com/elllkere/neto/releases/latest/download/neto-openwrt-embedded.tar.gz
+https://github.com/elllkere/zakop/releases/latest/download/zakop-openwrt-embedded.tar.gz
 ```
 
 Поэтому asset name должен быть точно:
 
 ```text
-neto-openwrt-embedded.tar.gz
+zakop-openwrt-embedded.tar.gz
 ```
 
 ## Manual Version Override
@@ -128,11 +128,11 @@ neto-openwrt-embedded.tar.gz
 Если нужно собрать archive без git tag:
 
 ```sh
-NETO_VERSION=vX.Y.Z GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+ZAKOP_VERSION=vX.Y.Z GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ```
 
 Но для public release лучше использовать git tag, чтобы GitHub Release,
-`git describe` и `netod version` совпадали.
+`git describe` и `zakopd version` совпадали.
 
 ## Version Source
 

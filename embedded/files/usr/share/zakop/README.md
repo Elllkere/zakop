@@ -1,4 +1,4 @@
-Эта directory зарезервирована под neto runtime assets, которые ставятся из
+Эта directory зарезервирована под zakop runtime assets, которые ставятся из
 embedded archive.
 
 Runtime scripts copied here:

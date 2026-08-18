@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/policy"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/policy"
 )
 
 func TestLoadRuleCIDRsCombinesInlineAndFileCIDRs(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/proxyroute"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/proxyroute"
 )
 
 const MinimumVersion = "1.12.0"
@@ -87,7 +87,7 @@ func Generate(cfg config.Config) ([]byte, error) {
 		})
 	}
 
-	// netod uses a new source port per forwarded DNS query. Keep the DNS-only
+	// zakopd uses a new source port per forwarded DNS query. Keep the DNS-only
 	// sing-box UDP NAT entries much shorter than the listen option's 5m default.
 	inbounds := []any{
 		map[string]any{
@@ -161,7 +161,7 @@ func Generate(cfg config.Config) ([]byte, error) {
 		doc.Experimental = map[string]any{
 			"cache_file": map[string]any{
 				"enabled":      true,
-				"path":         "/tmp/neto/sing-box-cache.db",
+				"path":         "/tmp/zakop/sing-box-cache.db",
 				"store_fakeip": true,
 			},
 		}

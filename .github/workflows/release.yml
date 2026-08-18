@@ -38,20 +38,20 @@ jobs:
       - name: Validate
         run: |
           go test ./...
-          sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/neto/*.sh embedded/files/usr/share/neto/providers/*.sh
+          sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/zakop/*.sh embedded/files/usr/share/zakop/providers/*.sh
           jq empty embedded/files/usr/share/luci/menu.d/*.json
           jq empty embedded/files/usr/share/rpcd/acl.d/*.json
-          node --check embedded/files/www/luci-static/resources/view/neto/*.js
+          node --check embedded/files/www/luci-static/resources/view/zakop/*.js
 
       - name: Build archive
         env:
-          NETO_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          GOCACHE: /tmp/neto-go-cache
+          ZAKOP_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          GOCACHE: /tmp/zakop-go-cache
         run: |
           ./embedded/pack.sh
           ./scripts/test-archive.sh
-          sha256sum dist/neto-openwrt-embedded.tar.gz > dist/neto-openwrt-embedded.tar.gz.sha256
-          printf '%s\n' "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" > dist/neto-version.txt
+          sha256sum dist/zakop-openwrt-embedded.tar.gz > dist/zakop-openwrt-embedded.tar.gz.sha256
+          printf '%s\n' "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" > dist/zakop-version.txt
 
       - name: Create or update release
         env:
@@ -60,15 +60,15 @@ jobs:
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
-              dist/neto-openwrt-embedded.tar.gz \
-              dist/neto-openwrt-embedded.tar.gz.sha256 \
-              dist/neto-version.txt \
+              dist/zakop-openwrt-embedded.tar.gz \
+              dist/zakop-openwrt-embedded.tar.gz.sha256 \
+              dist/zakop-version.txt \
               --clobber
           else
             gh release create "$TAG" \
-              dist/neto-openwrt-embedded.tar.gz \
-              dist/neto-openwrt-embedded.tar.gz.sha256 \
-              dist/neto-version.txt \
+              dist/zakop-openwrt-embedded.tar.gz \
+              dist/zakop-openwrt-embedded.tar.gz.sha256 \
+              dist/zakop-version.txt \
               --title "$TAG" \
               --generate-notes \
               --verify-tag

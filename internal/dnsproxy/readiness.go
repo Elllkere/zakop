@@ -10,8 +10,8 @@ import (
 
 const readinessAttemptTimeout = time.Second
 
-// WaitReady waits until the netod DNS listener can complete a real-DNS query.
-// This proves that both netod and the selected sing-box real-DNS path are ready.
+// WaitReady waits until the zakopd DNS listener can complete a real-DNS query.
+// This proves that both zakopd and the selected sing-box real-DNS path are ready.
 func WaitReady(ctx context.Context, address string) error {
 	var lastErr error
 	for {

@@ -1,6 +1,6 @@
 # Testing
 
-Документ описывает local checks и router checks для `neto`.
+Документ описывает local checks и router checks для `zakop`.
 
 ## Local Tests
 
@@ -11,7 +11,7 @@ go test ./...
 sh -n embedded/*.sh scripts/*.sh
 jq empty embedded/files/usr/share/luci/menu.d/*.json
 jq empty embedded/files/usr/share/rpcd/acl.d/*.json
-node --check embedded/files/www/luci-static/resources/view/neto/*.js
+node --check embedded/files/www/luci-static/resources/view/zakop/*.js
 ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```
@@ -19,8 +19,8 @@ node --check embedded/files/www/luci-static/resources/view/neto/*.js
 Если sandbox не может писать в default Go cache:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache go test ./...
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache go test ./...
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ```
 
 ## Archive Checks
@@ -28,19 +28,19 @@ GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
 Embedded archive:
 
 ```text
-dist/neto-openwrt-embedded.tar.gz
+dist/zakop-openwrt-embedded.tar.gz
 ```
 
 Проверить layout:
 
 ```sh
-tar -tzf dist/neto-openwrt-embedded.tar.gz | sed -n '1,40p'
+tar -tzf dist/zakop-openwrt-embedded.tar.gz | sed -n '1,40p'
 ```
 
 Expected first line:
 
 ```text
-neto/
+zakop/
 ```
 
 Automated archive check:
@@ -54,12 +54,12 @@ Automated archive check:
 На OpenWrt/ImmortalWrt router:
 
 ```sh
-/etc/init.d/neto restart
-netod check
-netod compile
-netod status
-netod debug
-nft list table inet neto
+/etc/init.d/zakop restart
+zakopd check
+zakopd compile
+zakopd status
+zakopd debug
+nft list table inet zakop
 ip -4 rule show
 ip -4 route show table 101
 ```
@@ -67,18 +67,18 @@ ip -4 route show table 101
 Validate sing-box config:
 
 ```sh
-/usr/libexec/neto/sing-box check -c /tmp/neto/sing-box.json
+/usr/libexec/zakop/sing-box check -c /tmp/zakop/sing-box.json
 ```
 
 or, if system sing-box is used:
 
 ```sh
-sing-box check -c /tmp/neto/sing-box.json
+sing-box check -c /tmp/zakop/sing-box.json
 ```
 
 ## DNS Tests
 
-Local netod listener:
+Local zakopd listener:
 
 ```sh
 dig @127.0.0.1 -p 5353 youtube.com A
@@ -123,7 +123,7 @@ Expected:
 Check rule order:
 
 ```sh
-nft list table inet neto
+nft list table inet zakop
 ```
 
 Expected order:
@@ -159,10 +159,10 @@ First use the LuCI Providers page `Import provider presets` action when checking
 built-in provider names on a fresh install.
 
 ```sh
-netod providers update
-netod providers update cloudflare_ipv4
-netod providers update telegram_ipv4
-ls -la /etc/neto/provider-cache/
+zakopd providers update
+zakopd providers update cloudflare_ipv4
+zakopd providers update telegram_ipv4
+ls -la /etc/zakop/provider-cache/
 ```
 
 Telegram provider must save only IPv4 entries. IPv6 lines from the Telegram feed
@@ -173,31 +173,31 @@ are ignored.
 Manual import:
 
 ```sh
-netod import-uri -file /tmp/neto-import.txt
-uci show neto | grep '=outbound'
+zakopd import-uri -file /tmp/zakop-import.txt
+uci show zakop | grep '=outbound'
 ```
 
 Subscription update:
 
 ```sh
-netod subscriptions update my_sub
-uci show neto | grep "subscription='my_sub'"
+zakopd subscriptions update my_sub
+uci show zakop | grep "subscription='my_sub'"
 ```
 
 Cron block:
 
 ```sh
-grep -n "neto subscriptions" /etc/crontabs/root
-grep -n "netod providers update" /etc/crontabs/root
+grep -n "zakop subscriptions" /etc/crontabs/root
+grep -n "zakopd providers update" /etc/crontabs/root
 ```
 
 ## LuCI Manual Checks
 
 Verify on actual OpenWrt/ImmortalWrt LuCI:
 
-- General shows neto/sing-box status and versions.
-- General Start/Stop calls `/etc/init.d/neto start|stop`.
-- General Autostart calls `/etc/init.d/neto enable|disable`.
+- General shows zakop/sing-box status and versions.
+- General Start/Stop calls `/etc/init.d/zakop start|stop`.
+- General Autostart calls `/etc/init.d/zakop enable|disable`.
 - General exposes DNS preset/mode/outbound/transport and routing mode.
 - Advanced contains DNS listener, FakeIP range, AAAA filter, dnsmasq, LAN,
   sing-box listener, TProxy and nft settings.
@@ -220,15 +220,15 @@ Verify on actual OpenWrt/ImmortalWrt LuCI:
 Inspect UCI after LuCI save:
 
 ```sh
-uci show neto
+uci show zakop
 ```
 
 ## Debug Commands
 
 ```sh
-netod debug
-logread | grep -E 'netod|sing-box|dnsmasq' | tail -n 120
-grep -nE 'rule_set|rule-set|/tmp/sing-box/rulesets|"detour": "direct"' /tmp/neto/sing-box.json
+zakopd debug
+logread | grep -E 'zakopd|sing-box|dnsmasq' | tail -n 120
+grep -nE 'rule_set|rule-set|/tmp/sing-box/rulesets|"detour": "direct"' /tmp/zakop/sing-box.json
 ```
 
 The grep check should not find legacy sing-box rule-set paths or

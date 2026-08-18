@@ -7,48 +7,48 @@ import (
 )
 
 func TestGeneralLuCIShowsStatusControlsAndOnlyCoreSettings(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/general.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/general.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(data)
 	for _, want := range []string{
-		"'require neto.i18n as netoI18n'",
-		"commandResult('/etc/init.d/neto', [ 'status' ])",
-		"commandResult('/etc/init.d/neto', [ 'enabled' ])",
-		"commandResult('/bin/pidof', [ 'netod' ])",
+		"'require zakop.i18n as zakopI18n'",
+		"commandResult('/etc/init.d/zakop', [ 'status' ])",
+		"commandResult('/etc/init.d/zakop', [ 'enabled' ])",
+		"commandResult('/bin/pidof', [ 'zakopd' ])",
 		"commandResult('/bin/pidof', [ 'sing-box' ])",
-		"commandResult('/usr/bin/netod', [ 'version' ])",
+		"commandResult('/usr/bin/zakopd', [ 'version' ])",
 		"commandResult(singboxBin, [ 'version' ])",
-		"commandResult('/usr/share/neto/check-version.sh', [])",
+		"commandResult('/usr/share/zakop/check-version.sh', [])",
 		"refreshUpdateState: function()",
 		"status: 'checking'",
 		"this.updateState.status = update.status",
 		"window.setTimeout(L.bind(this.refreshUpdateState, this), 0)",
 		"latestOutput.textContent = update.latest || '-'",
 		"updateButton.disabled = !available",
-		"form.DummyValue, '_neto_status'",
+		"form.DummyValue, '_zakop_status'",
 		"form.DummyValue, '_singbox_status'",
-		"form.DummyValue, '_netod_version'",
+		"form.DummyValue, '_zakopd_version'",
 		"form.DummyValue, '_singbox_version'",
 		"form.DummyValue, '_latest_version'",
 		"form.DummyValue, '_update_status'",
 		"form.ListValue, 'update_via'",
 		"form.ListValue, 'update_outbound'",
 		"o.depends('update_via', 'proxy')",
-		"form.Button, '_neto_update'",
-		"fs.exec('/usr/share/neto/upgrade.sh', [ '--luci' ])",
+		"form.Button, '_zakop_update'",
+		"fs.exec('/usr/share/zakop/upgrade.sh', [ '--luci' ])",
 		"Update installed. Reconnecting to LuCI...",
 		"Connection interrupted. Reconnecting to verify the installed version...",
 		"window.setTimeout(function()",
 		"form.Button, '_service'",
 		"form.Button, '_autostart'",
-		"fs.exec('/etc/init.d/neto', [ action ])",
+		"fs.exec('/etc/init.d/zakop', [ action ])",
 		"waitForServiceState(action == 'start', 40)",
 		"window.setTimeout(resolve, 250)",
 		"Service did not start in time",
 		"Service did not stop in time",
-		"fs.exec('/sbin/uci', [ 'set', 'neto.main.enabled=1' ])",
+		"fs.exec('/sbin/uci', [ 'set', 'zakop.main.enabled=1' ])",
 		"form.ListValue, 'dns_upstream_preset'",
 		"o.value('cloudflare', _('Cloudflare'))",
 		"o.value('google', _('Google'))",
@@ -65,9 +65,9 @@ func TestGeneralLuCIShowsStatusControlsAndOnlyCoreSettings(t *testing.T) {
 		"form.Value, '_real_dns_doh'",
 		"splitDoHValue(formvalue",
 		"port = defaultDNSPort(protocol)",
-		"uci.set('neto', 'main', 'real_dns_server', host + ':' + port)",
-		"uci.set('neto', 'main', 'real_dns_transport', protocol)",
-		"uci.set('neto', 'main', 'real_dns_upstream', host + ':' + port)",
+		"uci.set('zakop', 'main', 'real_dns_server', host + ':' + port)",
+		"uci.set('zakop', 'main', 'real_dns_transport', protocol)",
+		"uci.set('zakop', 'main', 'real_dns_upstream', host + ':' + port)",
 		"form.ListValue, 'routing_mode'",
 		"o.value('simple', _('Simple'))",
 		"form.ListValue, 'default_outbound'",
@@ -87,8 +87,8 @@ func TestGeneralLuCIShowsStatusControlsAndOnlyCoreSettings(t *testing.T) {
 		"addSimpleTextList(s, '_simple_ip_cidr_text'",
 		"addSimpleDynamicList(s, 'simple_ip_file'",
 		"setListOption(section_id, target, splitTextValues(formvalue))",
-		"uci.set('neto', 'main', 'simple_domain_input', domainInput)",
-		"uci.set('neto', 'main', 'simple_ip_input', ipInput)",
+		"uci.set('zakop', 'main', 'simple_domain_input', domainInput)",
+		"uci.set('zakop', 'main', 'simple_ip_input', ipInput)",
 		"normalizeSimpleRuleState()",
 		"if (routingMode != 'simple')",
 		"o.retain = true",
@@ -134,7 +134,7 @@ func TestGeneralLuCIShowsStatusControlsAndOnlyCoreSettings(t *testing.T) {
 }
 
 func TestAdvancedLuCIContainsMovedSettingsButNoFakeIPToggle(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/neto/advanced.js")
+	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/advanced.js")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestAdvancedLuCIContainsMovedSettingsButNoFakeIPToggle(t *testing.T) {
 		"form.Value, 'fakeip_range'",
 		"form.Flag, 'resolve_for_subnet_rules'",
 		"form.Flag, 'nft_counters'",
-		"uci.set('neto', 'main', 'fakeip_enabled', '1')",
+		"uci.set('zakop', 'main', 'fakeip_enabled', '1')",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("advanced.js missing %q:\n%s", want, s)

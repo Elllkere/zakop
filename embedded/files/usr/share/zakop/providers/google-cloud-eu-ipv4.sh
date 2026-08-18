@@ -3,7 +3,7 @@
 set -eu
 
 GOOGLE_CLOUD_RANGES_URL="https://www.gstatic.com/ipranges/cloud.json"
-WORK_DIR="${TMPDIR:-/tmp}/neto-google-cloud-eu-ipv4.$$"
+WORK_DIR="${TMPDIR:-/tmp}/zakop-google-cloud-eu-ipv4.$$"
 JSON_FILE="$WORK_DIR/cloud.json"
 RESULT_FILE="$WORK_DIR/result.txt"
 
@@ -15,8 +15,8 @@ trap cleanup EXIT INT TERM
 fetch_url() {
 	url="$1"
 
-	if [ -n "${NETO_PROVIDER_PROXY:-}" ]; then
-		curl -fsSL --connect-timeout 15 --max-time 60 --proxy "$NETO_PROVIDER_PROXY" "$url"
+	if [ -n "${ZAKOP_PROVIDER_PROXY:-}" ]; then
+		curl -fsSL --connect-timeout 15 --max-time 60 --proxy "$ZAKOP_PROVIDER_PROXY" "$url"
 	else
 		curl -fsSL --connect-timeout 15 --max-time 60 --noproxy "*" "$url"
 	fi
@@ -65,17 +65,17 @@ extract_google_cloud_prefixes() {
 
 mkdir -p "$WORK_DIR"
 
-echo "neto: fetching Google Cloud IPv4 ranges for Europe" >&2
+echo "zakop: fetching Google Cloud IPv4 ranges for Europe" >&2
 fetch_url "$GOOGLE_CLOUD_RANGES_URL" > "$JSON_FILE"
 extract_google_cloud_prefixes < "$JSON_FILE" | sort -u > "$RESULT_FILE"
 
 if [ ! -s "$RESULT_FILE" ]; then
-	echo "neto: Google Cloud Europe IPv4 provider returned an empty list" >&2
+	echo "zakop: Google Cloud Europe IPv4 provider returned an empty list" >&2
 	exit 1
 fi
 
-if [ -n "${NETO_PROVIDER_OUTPUT:-}" ]; then
-	cp "$RESULT_FILE" "$NETO_PROVIDER_OUTPUT"
+if [ -n "${ZAKOP_PROVIDER_OUTPUT:-}" ]; then
+	cp "$RESULT_FILE" "$ZAKOP_PROVIDER_OUTPUT"
 else
 	cat "$RESULT_FILE"
 fi

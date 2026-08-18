@@ -1,6 +1,6 @@
-# neto
+# zakop
 
-`neto` - policy router для OpenWrt/ImmortalWrt, который принимает routing
+`zakop` - policy router для OpenWrt/ImmortalWrt, который принимает routing
 решения до попадания трафика в `sing-box`.
 
 **English version:** [README_EN.md](README_EN.md)
@@ -13,7 +13,7 @@
 - backend для `TProxy` inbound;
 - executor для proxy outbounds.
 
-Это принципиально отличается от схемы "весь LAN traffic -> sing-box". В neto
+Это принципиально отличается от схемы "весь LAN traffic -> sing-box". В zakop
 обычный `direct` traffic остается вне sing-box.
 
 ## Status
@@ -33,7 +33,7 @@
 
 - IPv6 routing;
 - fw3 / iptables;
-- custom transparent proxy внутри `netod`;
+- custom transparent proxy внутри `zakopd`;
 - custom FakeIP allocator;
 - `.ipk` packaging.
 
@@ -59,10 +59,10 @@ Current embedded archive:
 - download size: около 7 MB;
 - unpacked install archive in `/tmp`: около 19 MB, потому что внутри binaries
   для нескольких CPU arch;
-- installed neto без `sing-box`: около 5 MB flash (`netod`, LuCI, scripts,
+- installed zakop без `sing-box`: около 5 MB flash (`zakopd`, LuCI, scripts,
   config templates).
 
-На устройствах с 64 MB RAM или 16 MB flash neto обычно нецелесообразен:
+На устройствах с 64 MB RAM или 16 MB flash zakop обычно нецелесообразен:
 `sing-box`, LuCI и provider caches быстро съедают запас. Для таких устройств
 лучше использовать более лёгкую схему без `sing-box`.
 
@@ -71,45 +71,52 @@ Current embedded archive:
 Установка с GitHub:
 
 ```sh
-sh -c "$(wget -O- https://raw.githubusercontent.com/elllkere/neto/main/embedded/install.sh)"
+sh -c "$(wget -O- https://raw.githubusercontent.com/elllkere/zakop/main/embedded/install.sh)"
 ```
 
 или:
 
 ```sh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/elllkere/neto/main/embedded/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/elllkere/zakop/main/embedded/install.sh)"
 ```
 
 Installer скачивает archive из GitHub Releases:
 
 ```text
-https://github.com/elllkere/neto/releases/latest/download/neto-openwrt-embedded.tar.gz
+https://github.com/elllkere/zakop/releases/latest/download/zakop-openwrt-embedded.tar.gz
 ```
 
 Если нужен свой mirror:
 
 ```sh
-NETO_BASE_URL='https://your-host/path' sh -c "$(wget -O- https://raw.githubusercontent.com/elllkere/neto/main/embedded/install.sh)"
+ZAKOP_BASE_URL='https://your-host/path' sh -c "$(wget -O- https://raw.githubusercontent.com/elllkere/zakop/main/embedded/install.sh)"
 ```
 
 Для локального archive:
 
 ```sh
-./embedded/install.sh --local ./dist/neto-openwrt-embedded.tar.gz
+./embedded/install.sh --local ./dist/zakop-openwrt-embedded.tar.gz
 ```
+
+## Миграция с neto
+
+Новый installer умеет перенести существующую установку `neto` вместе с UCI,
+provider caches и persistent data. Инструкции для автоматического переноса,
+ручного восстановления и полностью чистой переустановки находятся в
+[docs/MIGRATION_FROM_NETO.md](docs/MIGRATION_FROM_NETO.md).
 
 ## Upgrade
 
 После установки:
 
 ```sh
-/usr/share/neto/upgrade.sh
+/usr/share/zakop/upgrade.sh
 ```
 
 `upgrade.sh` скачивает свежий installer из GitHub raw. Для своего installer URL:
 
 ```sh
-NETO_INSTALL_URL='https://your-host/install.sh' /usr/share/neto/upgrade.sh
+ZAKOP_INSTALL_URL='https://your-host/install.sh' /usr/share/zakop/upgrade.sh
 ```
 
 Способ проверки и загрузки релиза настраивается на странице General:
@@ -119,35 +126,35 @@ NETO_INSTALL_URL='https://your-host/install.sh' /usr/share/neto/upgrade.sh
 
 ## Uninstall
 
-Обычное удаление оставляет `/etc/config/neto` и `/etc/neto`, чтобы можно было
-поставить neto заново без потери config:
+Обычное удаление оставляет `/etc/config/zakop` и `/etc/zakop`, чтобы можно было
+поставить zakop заново без потери config:
 
 ```sh
-/usr/share/neto/uninstall.sh
+/usr/share/zakop/uninstall.sh
 ```
 
 Полное удаление вместе с config:
 
 ```sh
-/usr/share/neto/uninstall.sh --purge
+/usr/share/zakop/uninstall.sh --purge
 ```
 
-Uninstall script останавливает service, убирает neto-owned DNS/dnsmasq changes,
-удаляет `netod`, LuCI files, `/usr/libexec/neto`, `/usr/share/neto`,
-`/tmp/neto`, `/var/lib/neto` и DNS restore state under
-`/etc/neto/dnsmasq-state/`. Persistent provider cache under
-`/etc/neto/provider-cache/` is kept unless `--purge` is used.
+Uninstall script останавливает service, убирает zakop-owned DNS/dnsmasq changes,
+удаляет `zakopd`, LuCI files, `/usr/libexec/zakop`, `/usr/share/zakop`,
+`/tmp/zakop`, `/var/lib/zakop` и DNS restore state under
+`/etc/zakop/dnsmasq-state/`. Persistent provider cache under
+`/etc/zakop/provider-cache/` is kept unless `--purge` is used.
 
 ## Quick Check
 
 На router:
 
 ```sh
-netod check
-netod compile
-/usr/libexec/neto/sing-box check -c /tmp/neto/sing-box.json
-/etc/init.d/neto restart
-netod status
+zakopd check
+zakopd compile
+/usr/libexec/zakop/sing-box check -c /tmp/zakop/sing-box.json
+/etc/init.d/zakop restart
+zakopd status
 ```
 
 Проверка DNS:
@@ -160,14 +167,14 @@ dig @127.0.0.1 -p 5353 youtube.com AAAA
 Проверка nft/TProxy:
 
 ```sh
-nft list table inet neto
+nft list table inet zakop
 ip -4 rule show
 ip -4 route show table 101
 ```
 
 ## Routing Model
 
-`neto` работает только с LAN client traffic.
+`zakop` работает только с LAN client traffic.
 
 Порядок в generated `nft`:
 
@@ -206,7 +213,7 @@ Rule action:
 DNS chain:
 
 ```text
-LAN DNS -> dnsmasq -> netod -> selected local sing-box DNS listener
+LAN DNS -> dnsmasq -> zakopd -> selected local sing-box DNS listener
 ```
 
 Packet chain:
@@ -215,7 +222,7 @@ Packet chain:
 LAN traffic -> nft decides before sing-box
 ```
 
-`netod` не реализует DoH/DoT/DoQ transport. Он только выбирает DNS path:
+`zakopd` не реализует DoH/DoT/DoQ transport. Он только выбирает DNS path:
 
 - `fakeip`;
 - `real-direct`;
@@ -230,9 +237,9 @@ Local DNS listeners:
 - real-direct: `127.0.0.1:15354`
 - real-proxy: `127.0.0.1:15355`
 
-sing-box logs are kept out of OpenWrt `logread` / LuCI System Log. neto starts
+sing-box logs are kept out of OpenWrt `logread` / LuCI System Log. zakop starts
 sing-box through a small wrapper that writes volatile logs to
-`/tmp/neto/sing-box.log`; LuCI shows it in the `Logs` page. The default path is
+`/tmp/zakop/sing-box.log`; LuCI shows it in the `Logs` page. The default path is
 under `/tmp` to avoid persistent flash/overlay writes.
 
 Semantics:
@@ -294,10 +301,10 @@ rules. Пустых `Auto`/`Select outbound` в outbound selectors нет: но�
 создать proxy rule.
 
 На той же странице можно создать priority pool из двух или более outbounds.
-Порядок участников задает строгий приоритет: netod выбирает первый доступный,
+Порядок участников задает строгий приоритет: zakopd выбирает первый доступный,
 переключается на следующий при отказе и автоматически возвращается на основной
 после восстановления. Pool можно выбрать в rules, client policy, simple mode,
-proxy DNS и для обновлений subscriptions, providers и самого neto.
+proxy DNS и для обновлений subscriptions, providers и самого zakop.
 
 ```uci
 config outbound_pool 'main_pool'
@@ -313,7 +320,7 @@ config outbound_pool 'main_pool'
 в отдельном столбце таблицы Outbounds, лучший доступный сервер подсвечивается.
 LuCI проверяет серверы отдельными последовательными запросами: таймаут одного
 сервера не останавливает остальные. Для CLI доступна та же проверка:
-`netod outbounds latency`.
+`zakopd outbounds latency`.
 
 ## Providers
 
@@ -336,12 +343,12 @@ LuCI Providers page кнопкой import добавляет provider presets, �
 
 - Cloudflare IPv4: `https://www.cloudflare.com/ips-v4/`
 - Telegram IPv4: `https://core.telegram.org/resources/cidr.txt`
-- Akamai IPv4: `/usr/share/neto/providers/akamai-ipv4.sh`
-- AWS CDN IPv4 (`CLOUDFRONT`, `S3`): `/usr/share/neto/providers/aws-ipv4.sh`
+- Akamai IPv4: `/usr/share/zakop/providers/akamai-ipv4.sh`
+- AWS CDN IPv4 (`CLOUDFRONT`, `S3`): `/usr/share/zakop/providers/aws-ipv4.sh`
 - AWS Full IPv4 (`AMAZON`, `EC2`, `GLOBALACCELERATOR`):
-  `/usr/share/neto/providers/aws-full-ipv4.sh`
-- AWS Full EU IPv4: `/usr/share/neto/providers/aws-full-eu-ipv4.sh`
-- Google Cloud Europe IPv4: `/usr/share/neto/providers/google-cloud-eu-ipv4.sh`
+  `/usr/share/zakop/providers/aws-full-ipv4.sh`
+- AWS Full EU IPv4: `/usr/share/zakop/providers/aws-full-eu-ipv4.sh`
+- Google Cloud Europe IPv4: `/usr/share/zakop/providers/google-cloud-eu-ipv4.sh`
 
 AWS Full can match broad AWS infrastructure and may affect ping to games hosted
 on Amazon/AWS servers if a rule routes it through proxy.
@@ -353,28 +360,28 @@ Built-in JSON scripts используют `jq`, если он уже устан
 
 В секциях Subscriptions и Providers есть кнопка `Update all`: она сохраняет
 текущую конфигурацию, обновляет все включенные подписки или все провайдеры и
-перезапускает neto. Индивидуальная кнопка `Update` в каждой секции остается
+перезапускает zakop. Индивидуальная кнопка `Update` в каждой секции остается
 доступной. Обновления выполняются отдельными последовательными запросами с
 прогрессом, поэтому длинный общий XHR не таймаутится; ошибка одного источника
 не останавливает следующие.
 
-Telegram feed содержит IPv6; neto сохраняет только valid IPv4 CIDR/address
+Telegram feed содержит IPv6; zakop сохраняет только valid IPv4 CIDR/address
 entries.
 
 URL provider - дефолтный источник. Для feed в JSON или с лишними полями можно
 использовать script provider: `type` всё ещё задаёт формат результата
 (`domain`/`ip`), а `source 'script'` только меняет способ получения данных.
 Скрипт должен вернуть по одному домену/IP/CIDR на строку: либо в stdout, либо
-записав финальный результат в temp-файл из `NETO_PROVIDER_OUTPUT`. neto читает
+записав финальный результат в temp-файл из `ZAKOP_PROVIDER_OUTPUT`. zakop читает
 этот файл только после завершения скрипта, сам нормализует результат, сохраняет
-`/etc/neto/provider-cache/<name>.txt` и обновляет metadata.
+`/etc/zakop/provider-cache/<name>.txt` и обновляет metadata.
 
 ```uci
 config provider 'json_ips'
 	option label 'JSON IPs'
 	option type 'ip'
 	option source 'script'
-	option script_path '/usr/share/neto/providers/json-ips.sh'
+	option script_path '/usr/share/zakop/providers/json-ips.sh'
 	option auto_update '1'
 	option update_schedule 'time'
 	option update_hour '3'
@@ -391,9 +398,9 @@ config provider 'json_ips'
 Поддерживаемые интервалы: `15`, `30`, `60`, `120`, `180`, `360`, `720`,
 `1440` минут.
 
-Скрипту передаются `NETO_PROVIDER_NAME`, `NETO_PROVIDER_TYPE`,
-`NETO_PROVIDER_CACHE`, `NETO_PROVIDER_OUTPUT` и другие `NETO_PROVIDER_*`
-переменные. При `update_via 'proxy'` neto также выставляет
+Скрипту передаются `ZAKOP_PROVIDER_NAME`, `ZAKOP_PROVIDER_TYPE`,
+`ZAKOP_PROVIDER_CACHE`, `ZAKOP_PROVIDER_OUTPUT` и другие `ZAKOP_PROVIDER_*`
+переменные. При `update_via 'proxy'` zakop также выставляет
 `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`.
 
 Manual update:
@@ -402,25 +409,25 @@ On a fresh install, built-in provider names exist after importing provider
 presets from the LuCI Providers page.
 
 ```sh
-netod providers update
-netod providers update telegram_ipv4
+zakopd providers update
+zakopd providers update telegram_ipv4
 ```
 
 LuCI Providers page has an `Import provider presets` action that adds reusable
 community domain sources and built-in IP URL/script sources. It only creates
 providers, with `auto_update '0'`; rules are still configured separately.
 
-Provider caches are written to `/etc/neto/provider-cache/` so rules can compile
+Provider caches are written to `/etc/zakop/provider-cache/` so rules can compile
 after an OpenWrt reboot even when `/var` is linked to volatile `/tmp`.
-Legacy `local_path` values under `/var/lib/neto/providers/` are treated as the
+Legacy `local_path` values under `/var/lib/zakop/providers/` are treated as the
 default provider cache and resolved to the persistent path.
 
-If a referenced provider cache is missing, neto logs a warning and compiles
-that provider reference as empty until `netod providers update <name>` succeeds.
+If a referenced provider cache is missing, zakop logs a warning and compiles
+that provider reference as empty until `zakopd providers update <name>` succeeds.
 
 ## LuCI
 
-LuCI app находится в `Services -> neto`.
+LuCI app находится в `Services -> zakop`.
 
 Основные страницы:
 
@@ -430,7 +437,7 @@ LuCI app находится в `Services -> neto`.
 - Clients: client policy.
 - Providers: remote provider sources.
 - Advanced: low-level DNS listeners, dnsmasq, LAN, TProxy, FakeIP range.
-- Debug: `netod debug`.
+- Debug: `zakopd debug`.
 
 В Rules page `dns_mode` скрыт и пишется как `auto`; DNS behavior выводится из
 типа rule автоматически.
@@ -450,18 +457,18 @@ LuCI app находится в `Services -> neto`.
 Локальная сборка:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache go test ./...
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache go test ./...
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```
 
 Archive:
 
 ```text
-dist/neto-openwrt-embedded.tar.gz
+dist/zakop-openwrt-embedded.tar.gz
 ```
 
-В archive должен быть top-level directory `neto/`.
+В archive должен быть top-level directory `zakop/`.
 
 ## Release Checklist
 
@@ -470,7 +477,7 @@ dist/neto-openwrt-embedded.tar.gz
 1. Собрать archive:
 
 ```sh
-GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
+GOCACHE=/tmp/zakop-go-cache ./embedded/pack.sh
 ./scripts/test-archive.sh
 ```
 
@@ -478,13 +485,13 @@ GOCACHE=/tmp/neto-go-cache ./embedded/pack.sh
 3. Загрузить asset с точным именем:
 
 ```text
-neto-openwrt-embedded.tar.gz
+zakop-openwrt-embedded.tar.gz
 ```
 
 Installer скачивает именно:
 
 ```text
-https://github.com/elllkere/neto/releases/latest/download/neto-openwrt-embedded.tar.gz
+https://github.com/elllkere/zakop/releases/latest/download/zakop-openwrt-embedded.tar.gz
 ```
 
 Полный процесс: [docs/RELEASE.md](docs/RELEASE.md).

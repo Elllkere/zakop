@@ -21,25 +21,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/dnsproxy"
-	"github.com/elllkere/neto/internal/importer"
-	"github.com/elllkere/neto/internal/nft"
-	"github.com/elllkere/neto/internal/outboundpool"
-	"github.com/elllkere/neto/internal/provider"
-	"github.com/elllkere/neto/internal/singbox"
-	"github.com/elllkere/neto/internal/status"
-	"github.com/elllkere/neto/internal/tproxy"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/dnsproxy"
+	"github.com/elllkere/zakop/internal/importer"
+	"github.com/elllkere/zakop/internal/nft"
+	"github.com/elllkere/zakop/internal/outboundpool"
+	"github.com/elllkere/zakop/internal/provider"
+	"github.com/elllkere/zakop/internal/singbox"
+	"github.com/elllkere/zakop/internal/status"
+	"github.com/elllkere/zakop/internal/tproxy"
 )
 
 const (
-	defaultOutDir = "/tmp/neto"
-	nftFileName   = "neto.nft"
+	defaultOutDir = "/tmp/zakop"
+	nftFileName   = "zakop.nft"
 	sbFileName    = "sing-box.json"
 )
 
 var version = "dev"
-var singBoxLogPath = "/tmp/neto/sing-box.log"
+var singBoxLogPath = "/tmp/zakop/sing-box.log"
 
 type options struct {
 	configPath        string
@@ -99,7 +99,7 @@ const latencyTestURL = "https://www.gstatic.com/generate_204"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "netod:", err)
+		fmt.Fprintln(os.Stderr, "zakopd:", err)
 		os.Exit(1)
 	}
 }
@@ -112,7 +112,7 @@ func run(args []string) error {
 
 	switch args[0] {
 	case "version":
-		fmt.Printf("netod %s\n", version)
+		fmt.Printf("zakopd %s\n", version)
 		return nil
 	case "check":
 		opts, err := parseOptions(args[0], args[1:], true)
@@ -197,9 +197,9 @@ func run(args []string) error {
 
 func parseOutboundLatencyOptions(args []string) (outboundLatencyOptions, error) {
 	if len(args) == 0 || args[0] != "latency" {
-		return outboundLatencyOptions{}, fmt.Errorf("usage: netod outbounds latency [tag] [options]")
+		return outboundLatencyOptions{}, fmt.Errorf("usage: zakopd outbounds latency [tag] [options]")
 	}
-	fs := flag.NewFlagSet("netod outbounds latency", flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd outbounds latency", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := outboundLatencyOptions{configPath: config.DefaultPath}
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to UCI config")
@@ -216,7 +216,7 @@ func parseOutboundLatencyOptions(args []string) (outboundLatencyOptions, error) 
 }
 
 func parseReadyOptions(args []string) (readyOptions, error) {
-	fs := flag.NewFlagSet("netod ready", flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd ready", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := readyOptions{
 		configPath: config.DefaultPath,
@@ -237,7 +237,7 @@ func parseReadyOptions(args []string) (readyOptions, error) {
 }
 
 func parseDownloadOptions(args []string) (downloadOptions, error) {
-	fs := flag.NewFlagSet("netod download", flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd download", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := downloadOptions{configPath: config.DefaultPath}
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to UCI config")
@@ -262,7 +262,7 @@ func parseDownloadOptions(args []string) (downloadOptions, error) {
 }
 
 func parseOptions(command string, args []string, checkFlags bool) (options, error) {
-	fs := flag.NewFlagSet("netod "+command, flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd "+command, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := options{
 		configPath: config.DefaultPath,
@@ -284,7 +284,7 @@ func parseOptions(command string, args []string, checkFlags bool) (options, erro
 }
 
 func parseImportOptions(args []string) (importOptions, error) {
-	fs := flag.NewFlagSet("netod import-uri", flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd import-uri", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := importOptions{configPath: config.DefaultPath}
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to UCI config")
@@ -303,9 +303,9 @@ func parseImportOptions(args []string) (importOptions, error) {
 
 func parseSubscriptionOptions(args []string) (subscriptionOptions, error) {
 	if len(args) == 0 || args[0] != "update" {
-		return subscriptionOptions{}, fmt.Errorf("usage: netod subscriptions update [name] [options]")
+		return subscriptionOptions{}, fmt.Errorf("usage: zakopd subscriptions update [name] [options]")
 	}
-	fs := flag.NewFlagSet("netod subscriptions update", flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd subscriptions update", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := subscriptionOptions{configPath: config.DefaultPath}
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to UCI config")
@@ -323,9 +323,9 @@ func parseSubscriptionOptions(args []string) (subscriptionOptions, error) {
 
 func parseProviderOptions(args []string) (providerOptions, error) {
 	if len(args) == 0 || args[0] != "update" {
-		return providerOptions{}, fmt.Errorf("usage: netod providers update [name] [options]")
+		return providerOptions{}, fmt.Errorf("usage: zakopd providers update [name] [options]")
 	}
-	fs := flag.NewFlagSet("netod providers update", flag.ContinueOnError)
+	fs := flag.NewFlagSet("zakopd providers update", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	opts := providerOptions{configPath: config.DefaultPath}
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to UCI config")
@@ -342,7 +342,7 @@ func parseProviderOptions(args []string) (providerOptions, error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: netod <version|check|compile|apply|status|debug|run|ready|import-uri|subscriptions|providers|download|outbounds|logs> [options]")
+	fmt.Fprintln(os.Stderr, "usage: zakopd <version|check|compile|apply|status|debug|run|ready|import-uri|subscriptions|providers|download|outbounds|logs> [options]")
 }
 
 func commandCheck(opts options) error {
@@ -352,7 +352,7 @@ func commandCheck(opts options) error {
 	}
 	printWarnings(cfg)
 	if !cfg.Main.Enabled {
-		fmt.Println("config ok: neto is disabled")
+		fmt.Println("config ok: zakop is disabled")
 		return nil
 	}
 
@@ -388,7 +388,7 @@ func commandApply(opts options) error {
 	if !cfg.Main.Enabled {
 		_ = deleteNftTable()
 		_ = cleanupRouting(cfg.Main.Mark, cfg.Main.Table)
-		fmt.Println("neto is disabled; nft table and routing removed")
+		fmt.Println("zakop is disabled; nft table and routing removed")
 		return nil
 	}
 	cfg, nftPath, _, err := compile(opts)
@@ -428,7 +428,7 @@ func commandStatus(opts options) error {
 
 func commandLogs(args []string) error {
 	if len(args) == 0 || args[0] != "sing-box" {
-		return fmt.Errorf("usage: netod logs sing-box [clear]")
+		return fmt.Errorf("usage: zakopd logs sing-box [clear]")
 	}
 	if len(args) > 2 {
 		return fmt.Errorf("unexpected argument %q", args[2])
@@ -498,7 +498,7 @@ func commandRun(opts options) error {
 		return err
 	}
 	if !cfg.Main.Enabled {
-		fmt.Println("neto is disabled")
+		fmt.Println("zakop is disabled")
 		return nil
 	}
 
@@ -537,7 +537,7 @@ func commandReady(opts readyOptions) error {
 		return err
 	}
 	if !cfg.Main.Enabled {
-		return fmt.Errorf("neto is disabled")
+		return fmt.Errorf("zakop is disabled")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), opts.timeout)
@@ -666,7 +666,7 @@ func commandDebug(opts options) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("=== neto config ===")
+	fmt.Println("=== zakop config ===")
 	fmt.Printf("config: %s\n", opts.configPath)
 	fmt.Printf("outbounds: %s\n", status.OutboundsSummary(cfg))
 	printWarnings(cfg)
@@ -683,16 +683,16 @@ func commandDebug(opts options) error {
 	fmt.Println("=== lan scope ===")
 	fmt.Printf("lan_subnets4: %s\n", debugList(cfg.Main.LANSubnets))
 	fmt.Printf("lan_ifaces: %s\n", debugList(cfg.Main.LANIfaces))
-	fmt.Println("=== netod status ===")
+	fmt.Println("=== zakopd status ===")
 	fmt.Println(status.Summary(cfg))
 	fmt.Println("=== nft table ===")
-	printCommand("nft", "list", "table", "inet", "neto")
+	printCommand("nft", "list", "table", "inet", "zakop")
 	fmt.Println("=== ip rules ===")
 	printCommand("ip", "-4", "rule", "show")
 	fmt.Println("=== ip route table ===")
 	printCommand("ip", "-4", "route", "show", "table", strconv.Itoa(cfg.Main.Table))
 	fmt.Println("=== processes ===")
-	printCommand("sh", "-c", "ps w | grep -E 'netod|sing-box' | grep -v grep")
+	printCommand("sh", "-c", "ps w | grep -E 'zakopd|sing-box' | grep -v grep")
 	fmt.Println("=== listeners ===")
 	if _, err := exec.LookPath("ss"); err == nil {
 		printCommand("sh", "-c", "ss -lnp | grep -E '5353|15353|15354|15355|16001' || true")
@@ -872,7 +872,7 @@ func testOutboundLatencyBatch(cfg config.Config, items []outboundLatencyItem) ([
 	if err != nil {
 		return nil, err
 	}
-	dir, err := os.MkdirTemp("", "neto-latency-*")
+	dir, err := os.MkdirTemp("", "zakop-latency-*")
 	if err != nil {
 		return nil, err
 	}
@@ -1064,7 +1064,7 @@ func withTemporaryProxyCandidate(cfg config.Config, updateOutbound string, fn fu
 	if err != nil {
 		return err
 	}
-	dir, err := os.MkdirTemp("", "neto-subscription-*")
+	dir, err := os.MkdirTemp("", "zakop-subscription-*")
 	if err != nil {
 		return err
 	}
@@ -1100,7 +1100,7 @@ func runProviderScript(p config.Provider, proxy string) ([]byte, error) {
 		maxStderr = 64 << 10
 	)
 
-	dir, err := os.MkdirTemp("", "neto-provider-script-*")
+	dir, err := os.MkdirTemp("", "zakop-provider-script-*")
 	if err != nil {
 		return nil, err
 	}
@@ -1166,17 +1166,17 @@ func readProviderScriptOutput(path string, maxSize int64) ([]byte, bool, error) 
 func providerScriptEnv(p config.Provider, proxy string, outputPath string) []string {
 	env := append([]string{}, os.Environ()...)
 	env = append(env,
-		"NETO_PROVIDER_NAME="+p.Name,
-		"NETO_PROVIDER_LABEL="+p.Label,
-		"NETO_PROVIDER_TYPE="+p.Type,
-		"NETO_PROVIDER_URL="+p.URL,
-		"NETO_PROVIDER_CACHE="+p.CachePath(),
-		"NETO_PROVIDER_OUTPUT="+outputPath,
-		"NETO_PROVIDER_UPDATE_VIA="+p.UpdateVia,
+		"ZAKOP_PROVIDER_NAME="+p.Name,
+		"ZAKOP_PROVIDER_LABEL="+p.Label,
+		"ZAKOP_PROVIDER_TYPE="+p.Type,
+		"ZAKOP_PROVIDER_URL="+p.URL,
+		"ZAKOP_PROVIDER_CACHE="+p.CachePath(),
+		"ZAKOP_PROVIDER_OUTPUT="+outputPath,
+		"ZAKOP_PROVIDER_UPDATE_VIA="+p.UpdateVia,
 	)
 	if proxy != "" {
 		env = append(env,
-			"NETO_PROVIDER_PROXY="+proxy,
+			"ZAKOP_PROVIDER_PROXY="+proxy,
 			"HTTP_PROXY="+proxy,
 			"HTTPS_PROXY="+proxy,
 			"ALL_PROXY="+proxy,
@@ -1220,7 +1220,7 @@ func fetchURLWithCurl(rawURL string, proxy string) ([]byte, error) {
 	if err := requireCommand("curl"); err != nil {
 		return nil, err
 	}
-	dir, err := os.MkdirTemp("", "neto-subscription-curl-*")
+	dir, err := os.MkdirTemp("", "zakop-subscription-curl-*")
 	if err != nil {
 		return nil, err
 	}
@@ -1233,7 +1233,7 @@ func fetchURLWithCurl(rawURL string, proxy string) ([]byte, error) {
 		"--connect-timeout", "15",
 		"--max-time", "60",
 		"--max-filesize", strconv.Itoa(maxBody),
-		"--user-agent", "neto/1",
+		"--user-agent", "zakop/1",
 		"--output", outPath,
 	}
 	if proxy != "" {
@@ -1274,7 +1274,7 @@ func downloadURLToFile(rawURL string, outputPath string, proxy string) error {
 		"--connect-timeout", "15",
 		"--max-time", "300",
 		"--max-filesize", strconv.Itoa(maxBody),
-		"--user-agent", "neto/1",
+		"--user-agent", "zakop/1",
 		"--output", tmp,
 	}
 	if proxy != "" {
@@ -1379,7 +1379,7 @@ func validateGeneratedSingBox(data []byte) error {
 		`"/tmp/sing-box/rulesets`,
 	} {
 		if strings.Contains(raw, forbidden) {
-			return fmt.Errorf("generated sing-box config contains unsupported %s; neto must not generate sing-box rule-set files", forbidden)
+			return fmt.Errorf("generated sing-box config contains unsupported %s; zakop must not generate sing-box rule-set files", forbidden)
 		}
 	}
 	return nil
@@ -1440,7 +1440,7 @@ func readRoutingState(cfg tproxy.Config) (string, string, error) {
 
 func deleteNftTable() error {
 	_ = requireCommand("nft")
-	_, err := command("nft", "delete", "table", "inet", "neto").CombinedOutput()
+	_, err := command("nft", "delete", "table", "inet", "zakop").CombinedOutput()
 	return err
 }
 

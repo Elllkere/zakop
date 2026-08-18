@@ -3,7 +3,7 @@ package proxyroute
 import (
 	"testing"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func TestTargetsFollowCustomOutboundOrder(t *testing.T) {

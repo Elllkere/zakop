@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -28,17 +28,17 @@ func TestVersionCommand(t *testing.T) {
 	if _, err := out.ReadFrom(r); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(out.String(), "netod ") {
+	if !strings.HasPrefix(out.String(), "zakopd ") {
 		t.Fatalf("unexpected version output: %q", out.String())
 	}
 }
 
 func TestParseOutboundLatencyOptions(t *testing.T) {
-	opts, err := parseOutboundLatencyOptions([]string{"latency", "-config", "/tmp/neto-test", "fast_node"})
+	opts, err := parseOutboundLatencyOptions([]string{"latency", "-config", "/tmp/zakop-test", "fast_node"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opts.tag != "fast_node" || opts.configPath != "/tmp/neto-test" {
+	if opts.tag != "fast_node" || opts.configPath != "/tmp/zakop-test" {
 		t.Fatalf("unexpected latency options: %+v", opts)
 	}
 	if _, err := parseOutboundLatencyOptions([]string{"test"}); err == nil {
@@ -47,11 +47,11 @@ func TestParseOutboundLatencyOptions(t *testing.T) {
 }
 
 func TestParseReadyOptions(t *testing.T) {
-	opts, err := parseReadyOptions([]string{"-config", "/tmp/neto-test", "-timeout", "7s"})
+	opts, err := parseReadyOptions([]string{"-config", "/tmp/zakop-test", "-timeout", "7s"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opts.configPath != "/tmp/neto-test" || opts.timeout != 7*time.Second {
+	if opts.configPath != "/tmp/zakop-test" || opts.timeout != 7*time.Second {
 		t.Fatalf("unexpected ready options: %+v", opts)
 	}
 	if _, err := parseReadyOptions([]string{"-timeout", "0s"}); err == nil {
@@ -61,7 +61,7 @@ func TestParseReadyOptions(t *testing.T) {
 
 func TestCommandOutboundsLatencyRequiresSingBox(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config main 'main'
 	option singbox_bin '/missing/sing-box'
@@ -108,7 +108,7 @@ func TestCommandDownloadDirect(t *testing.T) {
 		t.Fatal(err)
 	}
 	argsPath := installFakeCurl(t, responsePath)
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config main 'main'
 	option update_via 'direct'
@@ -141,7 +141,7 @@ config main 'main'
 
 func TestCommandDownloadProxyRequiresSingBox(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config main 'main'
 	option singbox_bin '/missing/sing-box'
@@ -166,7 +166,7 @@ config outbound 'updater'
 }
 
 func TestDisabledConfigDoesNotRequireOutbound(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "neto")
+	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`
 config main 'main'
 	option enabled '0'
@@ -202,7 +202,7 @@ func TestValidateGeneratedSingBoxRejectsLegacyRuleSets(t *testing.T) {
 
 func TestCommandImportURI(t *testing.T) {
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	importPath := filepath.Join(dir, "links.txt")
 	if err := os.WriteFile(cfgPath, []byte(`
 config main 'main'
@@ -233,7 +233,7 @@ func TestCommandSubscriptionsUpdateDirect(t *testing.T) {
 		t.Fatal(err)
 	}
 	argsPath := installFakeCurl(t, subPath)
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config subscription 'sub1'
 	option url 'https://example.com/sub'
@@ -273,7 +273,7 @@ func TestCommandProvidersUpdateDirect(t *testing.T) {
 	}
 	argsPath := installFakeCurl(t, listPath)
 	cachePath := filepath.Join(dir, "cache.txt")
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config provider 'domains'
 	option type 'domain'
@@ -313,13 +313,13 @@ func TestCommandProvidersUpdateScript(t *testing.T) {
 	envPath := filepath.Join(dir, "env.txt")
 	scriptPath := filepath.Join(dir, "provider-script")
 	script := `#!/bin/sh
-printf "%s\n" "$NETO_PROVIDER_NAME" > "` + envPath + `"
+printf "%s\n" "$ZAKOP_PROVIDER_NAME" > "` + envPath + `"
 printf "1.1.1.1\n8.8.8.0/24\n2001:db8::/32\n"
 `
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config provider 'json_ips'
 	option type 'ip'
@@ -362,13 +362,13 @@ func TestCommandProvidersUpdateScriptPrefersOutputFile(t *testing.T) {
 	scriptPath := filepath.Join(dir, "provider-script")
 	script := `#!/bin/sh
 printf "not-an-ip\n"
-printf "0.0.0.0/32\n" > "$NETO_PROVIDER_OUTPUT"
-printf "9.9.9.9\n8.8.8.0/24\n" > "$NETO_PROVIDER_OUTPUT"
+printf "0.0.0.0/32\n" > "$ZAKOP_PROVIDER_OUTPUT"
+printf "9.9.9.9\n8.8.8.0/24\n" > "$ZAKOP_PROVIDER_OUTPUT"
 `
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}
-	cfgPath := filepath.Join(dir, "neto")
+	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config provider 'json_ips'
 	option type 'ip'
@@ -473,7 +473,7 @@ func installFakeCurl(t *testing.T, responsePath string) string {
 out=""
 prev=""
 for arg in "$@"; do
-	printf "%s\n" "$arg" >> "$NETO_CURL_ARGS"
+	printf "%s\n" "$arg" >> "$ZAKOP_CURL_ARGS"
 	if [ "$prev" = "output" ]; then
 		out="$arg"
 		prev=""
@@ -486,13 +486,13 @@ done
 if [ -z "$out" ]; then
 	exit 2
 fi
-cat "$NETO_CURL_RESPONSE" > "$out"
+cat "$ZAKOP_CURL_RESPONSE" > "$out"
 `
 	if err := os.WriteFile(curlPath, []byte(script), 0755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("NETO_CURL_RESPONSE", responsePath)
-	t.Setenv("NETO_CURL_ARGS", argsPath)
+	t.Setenv("ZAKOP_CURL_RESPONSE", responsePath)
+	t.Setenv("ZAKOP_CURL_ARGS", argsPath)
 	return argsPath
 }

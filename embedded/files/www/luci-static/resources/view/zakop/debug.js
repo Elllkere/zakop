@@ -2,17 +2,17 @@
 'require fs';
 'require uci';
 'require view';
-'require neto.i18n as netoI18n';
-'require neto.ui as netoUI';
+'require zakop.i18n as zakopI18n';
+'require zakop.ui as zakopUI';
 
-var _ = netoI18n.translate;
+var _ = zakopI18n.translate;
 
 return view.extend({
 	load: function() {
-		return uci.load('neto').then(function() {
-			netoUI.syncRulesTab();
+		return uci.load('zakop').then(function() {
+			zakopUI.syncRulesTab();
 
-			return fs.exec('/usr/bin/netod', [ 'debug' ]).catch(function(err) {
+			return fs.exec('/usr/bin/zakopd', [ 'debug' ]).catch(function(err) {
 				return {
 					code: -1,
 					stdout: '',
@@ -25,7 +25,7 @@ return view.extend({
 	render: function(res) {
 		var text = res.stdout || res.stderr || _('No status available');
 
-		netoUI.syncRulesTab();
+		zakopUI.syncRulesTab();
 
 		return E([
 			E('h2', {}, [ _('Debug') ]),

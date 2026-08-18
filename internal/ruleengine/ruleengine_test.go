@@ -3,7 +3,7 @@ package ruleengine
 import (
 	"testing"
 
-	"github.com/elllkere/neto/internal/config"
+	"github.com/elllkere/zakop/internal/config"
 )
 
 func TestDomainMatchTypes(t *testing.T) {

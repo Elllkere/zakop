@@ -1,77 +1,77 @@
 {
-  "admin/services/neto": {
-    "title": "neto",
+  "admin/services/zakop": {
+    "title": "zakop",
     "order": 60,
     "action": {
       "type": "firstchild"
     },
     "depends": {
-      "acl": [ "luci-app-neto" ],
-      "uci": { "neto": true }
+      "acl": [ "luci-app-zakop" ],
+      "uci": { "zakop": true }
     }
   },
-  "admin/services/neto/general": {
+  "admin/services/zakop/general": {
     "title": "General",
     "order": 10,
     "action": {
       "type": "view",
-      "path": "neto/general"
+      "path": "zakop/general"
     }
   },
-  "admin/services/neto/rules": {
+  "admin/services/zakop/rules": {
     "title": "Rules",
     "order": 30,
     "action": {
       "type": "view",
-      "path": "neto/rules"
+      "path": "zakop/rules"
     }
   },
-  "admin/services/neto/clients": {
+  "admin/services/zakop/clients": {
     "title": "Clients",
     "order": 40,
     "action": {
       "type": "view",
-      "path": "neto/clients"
+      "path": "zakop/clients"
     }
   },
-  "admin/services/neto/outbounds": {
+  "admin/services/zakop/outbounds": {
     "title": "Outbounds",
     "order": 20,
     "action": {
       "type": "view",
-      "path": "neto/outbounds"
+      "path": "zakop/outbounds"
     }
   },
-  "admin/services/neto/providers": {
+  "admin/services/zakop/providers": {
     "title": "Providers",
     "order": 50,
     "action": {
       "type": "view",
-      "path": "neto/providers"
+      "path": "zakop/providers"
     }
   },
-  "admin/services/neto/advanced": {
+  "admin/services/zakop/advanced": {
     "title": "Advanced",
     "order": 60,
     "action": {
       "type": "view",
-      "path": "neto/advanced"
+      "path": "zakop/advanced"
     }
   },
-  "admin/services/neto/logs": {
+  "admin/services/zakop/logs": {
     "title": "Logs",
     "order": 80,
     "action": {
       "type": "view",
-      "path": "neto/logs"
+      "path": "zakop/logs"
     }
   },
-  "admin/services/neto/debug": {
+  "admin/services/zakop/debug": {
     "title": "Debug",
     "order": 90,
     "action": {
       "type": "view",
-      "path": "neto/debug"
+      "path": "zakop/debug"
     }
   }
 }

@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elllkere/neto/internal/config"
-	"github.com/elllkere/neto/internal/policy"
-	"github.com/elllkere/neto/internal/proxyroute"
-	"github.com/elllkere/neto/internal/ruleengine"
+	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/policy"
+	"github.com/elllkere/zakop/internal/proxyroute"
+	"github.com/elllkere/zakop/internal/ruleengine"
 )
 
 type Input struct {
@@ -31,7 +31,7 @@ func Generate(in Input) (string, error) {
 	}
 
 	var b strings.Builder
-	b.WriteString("table inet neto {\n")
+	b.WriteString("table inet zakop {\n")
 	writeSet(&b, "lan_subnets4", policy.CIDRStrings(lanSubnets))
 	writeSet(&b, "reserved4", policy.CIDRStrings(reserved4))
 	writeSet(&b, "direct_clients4", directClients)

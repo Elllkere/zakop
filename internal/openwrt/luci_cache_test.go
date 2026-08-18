@@ -14,9 +14,9 @@ func TestEmbeddedArchiveVersionsLuCIModuleURLs(t *testing.T) {
 	pack := string(packData)
 	for _, want := range []string{
 		"UI_CACHE_KEY=",
-		"UI_NAMESPACE=\"neto_${UI_CACHE_KEY}\"",
-		"neto-ui-cache.txt",
-		"s/'require neto\\./'require $UI_NAMESPACE./g",
+		"UI_NAMESPACE=\"zakop_${UI_CACHE_KEY}\"",
+		"zakop-ui-cache.txt",
+		"s/'require zakop\\./'require $UI_NAMESPACE./g",
 		"$UI_NAMESPACE/#g",
 	} {
 		if !strings.Contains(pack, want) {
@@ -30,8 +30,8 @@ func TestEmbeddedArchiveVersionsLuCIModuleURLs(t *testing.T) {
 	}
 	install := string(installData)
 	for _, want := range []string{
-		"/www/luci-static/resources/neto_*",
-		"/www/luci-static/resources/view/neto_*",
+		"/www/luci-static/resources/zakop_*",
+		"/www/luci-static/resources/view/zakop_*",
 		"content-versioned paths",
 	} {
 		if !strings.Contains(install, want) {

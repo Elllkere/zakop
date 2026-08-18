@@ -4,10 +4,10 @@
 'require ui';
 'require uci';
 'require view';
-'require neto.i18n as netoI18n';
-'require neto.ui as netoUI';
+'require zakop.i18n as zakopI18n';
+'require zakop.ui as zakopUI';
 
-var _ = netoI18n.translate;
+var _ = zakopI18n.translate;
 var communityDomainProviders = [
 	{
 		section: 'community_telegram_domains',
@@ -82,7 +82,7 @@ var builtinIPProviders = [
 		label: 'Akamai IPv4',
 		type: 'ip',
 		source: 'script',
-		script_path: '/usr/share/neto/providers/akamai-ipv4.sh',
+		script_path: '/usr/share/zakop/providers/akamai-ipv4.sh',
 		update_minute: '15'
 	},
 	{
@@ -90,7 +90,7 @@ var builtinIPProviders = [
 		label: 'AWS CDN IPv4',
 		type: 'ip',
 		source: 'script',
-		script_path: '/usr/share/neto/providers/aws-ipv4.sh',
+		script_path: '/usr/share/zakop/providers/aws-ipv4.sh',
 		update_minute: '20'
 	},
 	{
@@ -98,7 +98,7 @@ var builtinIPProviders = [
 		label: 'AWS Full IPv4 (may affect game ping)',
 		type: 'ip',
 		source: 'script',
-		script_path: '/usr/share/neto/providers/aws-full-ipv4.sh',
+		script_path: '/usr/share/zakop/providers/aws-full-ipv4.sh',
 		update_minute: '25'
 	},
 	{
@@ -106,7 +106,7 @@ var builtinIPProviders = [
 		label: 'AWS Full EU IPv4 (may affect game ping)',
 		type: 'ip',
 		source: 'script',
-		script_path: '/usr/share/neto/providers/aws-full-eu-ipv4.sh',
+		script_path: '/usr/share/zakop/providers/aws-full-eu-ipv4.sh',
 		update_minute: '30'
 	},
 	{
@@ -114,7 +114,7 @@ var builtinIPProviders = [
 		label: 'Google Cloud Europe IPv4',
 		type: 'ip',
 		source: 'script',
-		script_path: '/usr/share/neto/providers/google-cloud-eu-ipv4.sh',
+		script_path: '/usr/share/zakop/providers/google-cloud-eu-ipv4.sh',
 		update_minute: '35'
 	}
 ];
@@ -122,47 +122,47 @@ var builtinIPProviders = [
 function normalizeProviders() {
 	var firstOutbound = firstProxyOutboundTag();
 
-	uci.sections('neto', 'provider', function(section, sid) {
-		uci.unset('neto', sid, 'enabled');
+	uci.sections('zakop', 'provider', function(section, sid) {
+		uci.unset('zakop', sid, 'enabled');
 
-		if (uci.get('neto', sid, 'label') == null)
-			uci.set('neto', sid, 'label', uci.get('neto', sid, 'name') || sid);
+		if (uci.get('zakop', sid, 'label') == null)
+			uci.set('zakop', sid, 'label', uci.get('zakop', sid, 'name') || sid);
 
-		if (uci.get('neto', sid, 'type') == null)
-			uci.set('neto', sid, 'type', 'domain');
+		if (uci.get('zakop', sid, 'type') == null)
+			uci.set('zakop', sid, 'type', 'domain');
 
-		if (uci.get('neto', sid, 'source') == null)
-			uci.set('neto', sid, 'source', 'url');
+		if (uci.get('zakop', sid, 'source') == null)
+			uci.set('zakop', sid, 'source', 'url');
 
-		if (uci.get('neto', sid, 'auto_update') == null)
-			uci.set('neto', sid, 'auto_update', '0');
+		if (uci.get('zakop', sid, 'auto_update') == null)
+			uci.set('zakop', sid, 'auto_update', '0');
 
-		if (uci.get('neto', sid, 'update_schedule') == null)
-			uci.set('neto', sid, 'update_schedule', 'time');
+		if (uci.get('zakop', sid, 'update_schedule') == null)
+			uci.set('zakop', sid, 'update_schedule', 'time');
 
-		if (uci.get('neto', sid, 'update_hour') == null)
-			uci.set('neto', sid, 'update_hour', '0');
+		if (uci.get('zakop', sid, 'update_hour') == null)
+			uci.set('zakop', sid, 'update_hour', '0');
 
-		if (uci.get('neto', sid, 'update_minute') == null)
-			uci.set('neto', sid, 'update_minute', '5');
+		if (uci.get('zakop', sid, 'update_minute') == null)
+			uci.set('zakop', sid, 'update_minute', '5');
 
-		if (uci.get('neto', sid, 'update_interval_minutes') == null)
-			uci.set('neto', sid, 'update_interval_minutes', '360');
+		if (uci.get('zakop', sid, 'update_interval_minutes') == null)
+			uci.set('zakop', sid, 'update_interval_minutes', '360');
 
-		if (uci.get('neto', sid, 'update_via') == null)
-			uci.set('neto', sid, 'update_via', 'direct');
+		if (uci.get('zakop', sid, 'update_via') == null)
+			uci.set('zakop', sid, 'update_via', 'direct');
 
-		if (String(uci.get('neto', sid, 'update_via') || 'direct').trim() == 'proxy') {
-			var outbound = String(uci.get('neto', sid, 'update_outbound') || '').trim();
+		if (String(uci.get('zakop', sid, 'update_via') || 'direct').trim() == 'proxy') {
+			var outbound = String(uci.get('zakop', sid, 'update_outbound') || '').trim();
 
 			if (!proxyOutboundTagExists(outbound)) {
 				if (firstOutbound != '')
-					uci.set('neto', sid, 'update_outbound', firstOutbound);
+					uci.set('zakop', sid, 'update_outbound', firstOutbound);
 				else
-					uci.unset('neto', sid, 'update_outbound');
+					uci.unset('zakop', sid, 'update_outbound');
 			}
 		} else {
-			uci.unset('neto', sid, 'update_outbound');
+			uci.unset('zakop', sid, 'update_outbound');
 		}
 	});
 }
@@ -192,16 +192,16 @@ function cleanValues(value) {
 }
 
 function optionValues(section_id, option) {
-	return cleanValues(uci.get('neto', section_id, option));
+	return cleanValues(uci.get('zakop', section_id, option));
 }
 
 function activeProviderNames() {
 	var names = {};
 
-	uci.sections('neto', 'provider', function(section, sid) {
+	uci.sections('zakop', 'provider', function(section, sid) {
 		names[sid] = true;
 
-		var name = String(uci.get('neto', sid, 'name') || '').trim();
+		var name = String(uci.get('zakop', sid, 'name') || '').trim();
 		if (name != '')
 			names[name] = true;
 	});
@@ -220,11 +220,11 @@ function validateProviderReferences() {
 	var providers = activeProviderNames();
 	var error = null;
 
-	uci.sections('neto', 'rule', function(section, sid) {
-		if (error != null || uci.get('neto', sid, 'enabled') == '0')
+	uci.sections('zakop', 'rule', function(section, sid) {
+		if (error != null || uci.get('zakop', sid, 'enabled') == '0')
 			return;
 
-		var ruleName = String(uci.get('neto', sid, 'name') || sid).trim();
+		var ruleName = String(uci.get('zakop', sid, 'name') || sid).trim();
 		var refs = referencedProviders(sid);
 
 		for (var i = 0; i < refs.length; i++) {
@@ -242,7 +242,7 @@ function validateProviderReferences() {
 function firstProxyOutboundTag() {
 	var first = '';
 
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 
 		if (first == '' && tag != '' && tag != 'direct' && tag != 'blocked' && tag != 'block' && tag != 'proxy_default')
@@ -259,13 +259,13 @@ function proxyOutboundTagExists(wanted) {
 	if (wanted == '')
 		return false;
 
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 
 		if (tag == wanted && tag != 'direct' && tag != 'blocked' && tag != 'block' && tag != 'proxy_default')
 			found = true;
 	});
-	uci.sections('neto', 'outbound_pool', function(section, sid) {
+	uci.sections('zakop', 'outbound_pool', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 
 		if (tag == wanted && tag != 'direct' && tag != 'blocked' && tag != 'block' && tag != 'proxy_default')
@@ -278,7 +278,7 @@ function proxyOutboundTagExists(wanted) {
 function addProxyOutboundChoices(option) {
 	var first = firstProxyOutboundTag();
 
-	uci.sections('neto', 'outbound', function(section, sid) {
+	uci.sections('zakop', 'outbound', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 		var label = String(section.label || section.name || tag).trim();
 
@@ -287,7 +287,7 @@ function addProxyOutboundChoices(option) {
 
 		option.value(tag, label || tag);
 	});
-	uci.sections('neto', 'outbound_pool', function(section, sid) {
+	uci.sections('zakop', 'outbound_pool', function(section, sid) {
 		var tag = String(section.tag || sid || section['.name'] || '').trim();
 		var label = String(section.label || section.name || tag).trim();
 
@@ -315,8 +315,8 @@ function providerURLExists(url) {
 	var exists = false;
 
 	url = String(url || '').trim();
-	uci.sections('neto', 'provider', function(section, sid) {
-		if (String(uci.get('neto', sid, 'url') || '').trim() == url)
+	uci.sections('zakop', 'provider', function(section, sid) {
+		if (String(uci.get('zakop', sid, 'url') || '').trim() == url)
 			exists = true;
 	});
 
@@ -327,8 +327,8 @@ function providerScriptExists(scriptPath) {
 	var exists = false;
 
 	scriptPath = String(scriptPath || '').trim();
-	uci.sections('neto', 'provider', function(section, sid) {
-		if (String(uci.get('neto', sid, 'script_path') || '').trim() == scriptPath)
+	uci.sections('zakop', 'provider', function(section, sid) {
+		if (String(uci.get('zakop', sid, 'script_path') || '').trim() == scriptPath)
 			exists = true;
 	});
 
@@ -339,7 +339,7 @@ function uniqueProviderSection(base) {
 	var section = base;
 	var n = 2;
 
-	while (uci.get('neto', section) != null) {
+	while (uci.get('zakop', section) != null) {
 		section = base + '_' + n;
 		n++;
 	}
@@ -359,27 +359,27 @@ function addProviderPreset(def) {
 	}
 
 	section = uniqueProviderSection(def.section);
-	uci.add('neto', 'provider', section);
-	uci.set('neto', section, 'label', def.label);
-	uci.set('neto', section, 'type', def.type || 'domain');
-	uci.set('neto', section, 'source', source);
+	uci.add('zakop', 'provider', section);
+	uci.set('zakop', section, 'label', def.label);
+	uci.set('zakop', section, 'type', def.type || 'domain');
+	uci.set('zakop', section, 'source', source);
 	if (source == 'script')
-		uci.set('neto', section, 'script_path', def.script_path);
+		uci.set('zakop', section, 'script_path', def.script_path);
 	else
-		uci.set('neto', section, 'url', def.url);
-	uci.set('neto', section, 'auto_update', '0');
-	uci.set('neto', section, 'update_schedule', 'time');
-	uci.set('neto', section, 'update_hour', '0');
-	uci.set('neto', section, 'update_minute', def.update_minute || '5');
-	uci.set('neto', section, 'update_interval_minutes', '360');
-	uci.set('neto', section, 'update_via', 'direct');
+		uci.set('zakop', section, 'url', def.url);
+	uci.set('zakop', section, 'auto_update', '0');
+	uci.set('zakop', section, 'update_schedule', 'time');
+	uci.set('zakop', section, 'update_hour', '0');
+	uci.set('zakop', section, 'update_minute', def.update_minute || '5');
+	uci.set('zakop', section, 'update_interval_minutes', '360');
+	uci.set('zakop', section, 'update_via', 'direct');
 	return true;
 }
 
 return view.extend({
 	load: function() {
-		return uci.load('neto').then(function() {
-			netoUI.syncRulesTab();
+		return uci.load('zakop').then(function() {
+			zakopUI.syncRulesTab();
 		});
 	},
 
@@ -400,33 +400,33 @@ return view.extend({
 	handleSaveCommitConfig: function() {
 		return this.handleSave()
 			.then(function() {
-				return fs.exec('/sbin/uci', [ 'commit', 'neto' ]);
+				return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Commit failed'));
 
-				return uci.load('neto');
+				return uci.load('zakop');
 			});
 	},
 
 	handleSaveApply: function(ev) {
 		return this.handleSave(ev)
 			.then(function() {
-				return netoUI.applyAndRestart();
+				return zakopUI.applyAndRestart();
 			});
 	},
 
 	handleProviderUpdate: function(section_id) {
 		return this.handleSaveCommitConfig()
 			.then(function() {
-				return fs.exec('/usr/bin/netod', [ 'providers', 'update', section_id ]);
+				return fs.exec('/usr/bin/zakopd', [ 'providers', 'update', section_id ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Update failed'));
 
-				return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 			})
 			.then(function() {
 				window.location.reload();
@@ -443,7 +443,7 @@ return view.extend({
 		return this.handleSaveCommitConfig()
 			.then(L.bind(function() {
 				names = [];
-				uci.sections('neto', 'provider', function(section, sid) {
+				uci.sections('zakop', 'provider', function(section, sid) {
 					names.push(String(section['.name'] || sid));
 				});
 				if (names.length == 0)
@@ -453,7 +453,7 @@ return view.extend({
 			}, this))
 			.then(function(updateFailures) {
 				failures = updateFailures;
-				return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 			})
 			.then(function(res) {
 				if (res.code)
@@ -472,7 +472,7 @@ return view.extend({
 		names.forEach(function(name, index) {
 			chain = chain.then(function() {
 				self.setProviderUpdateAllButton(true, index + 1, names.length);
-				return fs.exec('/usr/bin/netod', [ 'providers', 'update', name ])
+				return fs.exec('/usr/bin/zakopd', [ 'providers', 'update', name ])
 					.then(function(res) {
 						if (res.code)
 							failures.push({ name: name, error: res.stderr || res.stdout || _('Update failed') });
@@ -486,7 +486,7 @@ return view.extend({
 	},
 
 	setProviderUpdateAllButton: function(running, current, total) {
-		var buttons = document.querySelectorAll('[data-neto-providers-update-all]');
+		var buttons = document.querySelectorAll('[data-zakop-providers-update-all]');
 		var text = running && total ? _('Updating %d/%d…').format(current, total) : (running ? _('Updating all…') : _('Update all'));
 
 		for (var i = 0; i < buttons.length; i++) {
@@ -525,21 +525,21 @@ return view.extend({
 					return Promise.resolve();
 				}
 
-				return uci.save('neto')
+				return uci.save('zakop')
 					.then(function(ok) {
 						if (ok === false)
 							throw new Error(_('Save failed'));
 
-						return fs.exec('/sbin/uci', [ 'commit', 'neto' ]);
+						return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
 					})
 					.then(function(res) {
 						if (res.code)
 							throw new Error(res.stderr || res.stdout || _('Commit failed'));
 
-						return uci.load('neto');
+						return uci.load('zakop');
 					})
 					.then(function() {
-						return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+						return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 					})
 					.then(function() {
 						window.location.reload();
@@ -550,9 +550,9 @@ return view.extend({
 	render: function() {
 		var m, s, o, self;
 
-		netoUI.syncRulesTab();
+		zakopUI.syncRulesTab();
 
-		m = new form.Map('neto', _('neto'));
+		m = new form.Map('zakop', _('zakop'));
 		this.map = m;
 		self = this;
 
@@ -561,7 +561,7 @@ return view.extend({
 		s.addremove = true;
 		s.modaltitle = _('Provider details');
 		s.sectiontitle = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		s.renderSectionAdd = function() {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
@@ -579,7 +579,7 @@ return view.extend({
 			el.appendChild(E('button', {
 				'class': 'cbi-button cbi-button-action',
 				'style': 'margin-left:.5em',
-				'data-neto-providers-update-all': '1',
+				'data-zakop-providers-update-all': '1',
 				'disabled': self.providerUpdateAllRunning ? true : null,
 				'click': function(ev) {
 					ev.preventDefault();
@@ -601,11 +601,11 @@ return view.extend({
 
 		o = s.option(form.Value, 'label', _('Name'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'label') || uci.get('neto', section_id, 'name') || section_id;
+			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
 		o.write = function(section_id, formvalue) {
 			var label = String(formvalue || '').trim();
-			uci.set('neto', section_id, 'label', label || section_id);
+			uci.set('zakop', section_id, 'label', label || section_id);
 		};
 		o.rmempty = false;
 		o.modalonly = true;
@@ -635,14 +635,14 @@ return view.extend({
 		o.modalonly = true;
 
 		o = s.option(form.Value, 'script_path', _('Script path'));
-		o.placeholder = '/usr/share/neto/providers/custom.sh';
+		o.placeholder = '/usr/share/zakop/providers/custom.sh';
 		o.depends('source', 'script');
 		o.rmempty = true;
 		o.modalonly = true;
 
 		o = s.option(form.DummyValue, '_script_help', _('Script provider notes'));
 		o.cfgvalue = function() {
-			return _('Use an absolute executable path. The script must print the final list to stdout or write it to NETO_PROVIDER_OUTPUT; one item per line. In proxy mode, neto exports NETO_PROVIDER_PROXY and HTTP_PROXY/HTTPS_PROXY/ALL_PROXY to the script.');
+			return _('Use an absolute executable path. The script must print the final list to stdout or write it to ZAKOP_PROVIDER_OUTPUT; one item per line. In proxy mode, zakop exports ZAKOP_PROVIDER_PROXY and HTTP_PROXY/HTTPS_PROXY/ALL_PROXY to the script.');
 		};
 		o.depends('source', 'script');
 		o.modalonly = true;
@@ -696,7 +696,7 @@ return view.extend({
 		o.depends('update_via', 'proxy');
 		o.forcewrite = true;
 		o.cfgvalue = function(section_id) {
-			var value = String(uci.get('neto', section_id, 'update_outbound') || '').trim();
+			var value = String(uci.get('zakop', section_id, 'update_outbound') || '').trim();
 
 			return proxyOutboundTagExists(value) ? value : firstUpdateOutbound;
 		};
@@ -710,12 +710,12 @@ return view.extend({
 
 		o = s.option(form.DummyValue, 'item_count', _('Items'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'item_count') || '-';
+			return uci.get('zakop', section_id, 'item_count') || '-';
 		};
 
 		o = s.option(form.DummyValue, 'last_update', _('Updated'));
 		o.cfgvalue = function(section_id) {
-			var value = uci.get('neto', section_id, 'last_update');
+			var value = uci.get('zakop', section_id, 'last_update');
 			var timestamp = Number(value);
 
 			if (!timestamp)
@@ -726,7 +726,7 @@ return view.extend({
 
 		o = s.option(form.DummyValue, 'local_path', _('Local cache'));
 		o.cfgvalue = function(section_id) {
-			return uci.get('neto', section_id, 'local_path') || '-';
+			return uci.get('zakop', section_id, 'local_path') || '-';
 		};
 		o.modalonly = true;
 

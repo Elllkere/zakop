@@ -56,7 +56,7 @@ function applyAndRestart() {
 			});
 		})
 		.then(function() {
-			return fs.exec('/etc/init.d/neto', [ 'restart' ]);
+			return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
 		})
 		.then(function(res) {
 			return commandSuccess(res, _('Restart failed'));
@@ -79,7 +79,7 @@ function applyAndRestart() {
 }
 
 function rulesTabVisible() {
-	return String(uci.get('neto', 'main', 'routing_mode') || 'custom').trim() == 'custom';
+	return String(uci.get('zakop', 'main', 'routing_mode') || 'custom').trim() == 'custom';
 }
 
 function hideElement(el, hidden) {
@@ -112,7 +112,7 @@ function updateRulesTab() {
 	for (var i = 0; i < links.length; i++) {
 		var href = String(links[i].getAttribute('href') || '');
 
-		if (href.indexOf('/admin/services/neto/rules') < 0 && href.indexOf('/neto/rules') < 0)
+		if (href.indexOf('/admin/services/zakop/rules') < 0 && href.indexOf('/zakop/rules') < 0)
 			continue;
 
 		hideElement(tabContainer(links[i]), hidden);

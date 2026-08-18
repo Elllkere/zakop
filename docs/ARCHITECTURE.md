@@ -1,13 +1,13 @@
 # Architecture
 
-Этот документ описывает runtime architecture `neto`. Термины `direct`,
+Этот документ описывает runtime architecture `zakop`. Термины `direct`,
 `proxy`, `block`, `FakeIP`, `TProxy`, `provider`, `rule`, `outbound`,
 `routing_mode` и UCI option names оставлены на английском, потому что это
 реальные значения config/UI/CLI.
 
 ## Goal
 
-`neto` - pre-sing-box policy router для OpenWrt/ImmortalWrt.
+`zakop` - pre-sing-box policy router для OpenWrt/ImmortalWrt.
 
 Главное правило: routing decision должен происходить в `nftables` до того, как
 traffic попадет в `sing-box`.
@@ -18,7 +18,7 @@ traffic попадет в `sing-box`.
 - backend для `TProxy` inbound;
 - executor для proxy outbounds.
 
-`netod` не должен становиться transparent TCP/UDP proxy.
+`zakopd` не должен становиться transparent TCP/UDP proxy.
 
 ## Supported Platforms
 
@@ -42,13 +42,13 @@ traffic попадет в `sing-box`.
 Основной формат поставки - embedded archive:
 
 ```text
-dist/neto-openwrt-embedded.tar.gz
+dist/zakop-openwrt-embedded.tar.gz
 ```
 
 Archive должен содержать top-level directory:
 
 ```text
-neto/
+zakop/
 ```
 
 Installer:
@@ -57,20 +57,20 @@ Installer:
 - выбирает `opkg` или `apk`;
 - ставит зависимости;
 - определяет CPU arch;
-- ставит нужный `netod`;
+- ставит нужный `zakopd`;
 - использует compatible system `sing-box`, если он есть;
-- иначе ставит managed `sing-box` в `/usr/libexec/neto/sing-box`;
+- иначе ставит managed `sing-box` в `/usr/libexec/zakop/sing-box`;
 - никогда не перезаписывает `/usr/bin/sing-box`.
 
 Default archive URL:
 
 ```text
-https://github.com/elllkere/neto/releases/latest/download/neto-openwrt-embedded.tar.gz
+https://github.com/elllkere/zakop/releases/latest/download/zakop-openwrt-embedded.tar.gz
 ```
 
 ## Components
 
-- `cmd/netod/main.go`: CLI entrypoint.
+- `cmd/zakopd/main.go`: CLI entrypoint.
 - `internal/config`: UCI parser и validation.
 - `internal/ruleengine`: domain matcher и DNS decision logic.
 - `internal/dnsproxy`: UDP/TCP DNS listener, DNS policy forwarding.
@@ -80,41 +80,41 @@ https://github.com/elllkere/neto/releases/latest/download/neto-openwrt-embedded.
 - `internal/singbox`: sing-box config generation/check support.
 - `internal/tproxy`: policy routing lifecycle.
 - `internal/status`: status/debug checks.
-- `embedded/files/etc/init.d/neto`: procd service.
-- `embedded/files/www/luci-static/resources/view/neto`: LuCI app.
+- `embedded/files/etc/init.d/zakop`: procd service.
+- `embedded/files/www/luci-static/resources/view/zakop`: LuCI app.
 
 ## Runtime Paths
 
-- `/etc/config/neto`
-- `/etc/init.d/neto`
-- `/usr/bin/netod`
-- `/usr/libexec/neto/sing-box`
-- `/usr/share/neto/`
-- `/etc/neto/provider-cache/`
-- `/etc/neto/dnsmasq-state/`
-- `/tmp/neto/neto.nft`
-- `/tmp/neto/sing-box.json`
-- `/tmp/neto/sing-box.log`
-- `/var/lib/neto/`
+- `/etc/config/zakop`
+- `/etc/init.d/zakop`
+- `/usr/bin/zakopd`
+- `/usr/libexec/zakop/sing-box`
+- `/usr/share/zakop/`
+- `/etc/zakop/provider-cache/`
+- `/etc/zakop/dnsmasq-state/`
+- `/tmp/zakop/zakop.nft`
+- `/tmp/zakop/sing-box.json`
+- `/tmp/zakop/sing-box.log`
+- `/var/lib/zakop/`
 
 ## Lifecycle
 
 Start sequence:
 
-1. `/etc/init.d/neto` runs `netod check`.
-2. Runs `netod compile`.
-3. Runs `netod apply`.
+1. `/etc/init.d/zakop` runs `zakopd check`.
+2. Runs `zakopd compile`.
+3. Runs `zakopd apply`.
 4. Checks generated sing-box config.
-5. Starts `netod run`.
-6. Starts selected `sing-box run -c /tmp/neto/sing-box.json`.
+5. Starts `zakopd run`.
+6. Starts selected `sing-box run -c /tmp/zakop/sing-box.json`.
 7. Configures dnsmasq integration and cron jobs.
 
 Stop sequence:
 
-- deletes neto-owned nft table;
-- removes neto-owned `ip rule` / route table state;
+- deletes zakop-owned nft table;
+- removes zakop-owned `ip rule` / route table state;
 - restores dnsmasq `server`, `noresolv`, `addsubnet`;
-- removes neto-owned cron block.
+- removes zakop-owned cron block.
 
 Stop/disable must not kill unrelated system `sing-box`.
 
@@ -123,7 +123,7 @@ Stop/disable must not kill unrelated system `sing-box`.
 Generated table:
 
 ```text
-table inet neto
+table inet zakop
 ```
 
 Order in `from_lan` chain:
@@ -143,7 +143,7 @@ is `tproxy_port + target_index`. nftables therefore preserves the selected
 outbound or pool for packet-level IP/CIDR rules without expanding provider CIDRs
 into sing-box rules.
 
-An outbound pool is emitted as a sing-box `selector`. netod probes its concrete
+An outbound pool is emitted as a sing-box `selector`. zakopd probes its concrete
 members through the localhost-only Clash API in strict list order and selects
 the first healthy member. It repeats the ordered check periodically, which also
 returns a recovered higher-priority member to service. This management loop
@@ -151,7 +151,7 @@ does not proxy transparent traffic and does not add router-self nft rules.
 
 FakeIP traffic initially enters the first TProxy inbound. Before sing-box route
 matching, FakeIP reverse mapping restores the domain; generated ordered domain
-route rules then select the outbound configured on the matching neto rule.
+route rules then select the outbound configured on the matching zakop rule.
 Unmatched sing-box traffic has `route.final=direct`.
 
 `TProxy` policy routing:
@@ -169,7 +169,7 @@ prerouting traffic должны вернуться до proxy/TProxy rules.
 Client policy:
 
 - absent/default: follows `routing_mode`;
-- `proxy`: force non-reserved TCP/UDP traffic from client through neto; optional
+- `proxy`: force non-reserved TCP/UDP traffic from client through zakop; optional
   `outbound` selects a custom sing-box outbound for that client;
 - `direct`: hard bypass, real DNS only, no FakeIP.
 
@@ -192,7 +192,7 @@ Rule action:
 DNS path:
 
 ```text
-LAN DNS -> dnsmasq -> netod -> selected sing-box DNS listener
+LAN DNS -> dnsmasq -> zakopd -> selected sing-box DNS listener
 ```
 
 Packet path:
@@ -201,13 +201,13 @@ Packet path:
 LAN traffic -> nft decides before sing-box
 ```
 
-`netod` listens on `dns_listen`, by default:
+`zakopd` listens on `dns_listen`, by default:
 
 ```text
 127.0.0.1:5353
 ```
 
-`netod` is DNS policy forwarder only. It decides:
+`zakopd` is DNS policy forwarder only. It decides:
 
 - `fakeip`;
 - `real-direct`;
@@ -227,9 +227,9 @@ Local sing-box DNS listeners:
 - `singbox_dns_real_direct`: `127.0.0.1:15354`
 - `singbox_dns_real_proxy`: `127.0.0.1:15355`
 
-sing-box process logs are not forwarded to OpenWrt `logread`. `/etc/init.d/neto`
-starts sing-box through `/usr/share/neto/run-sing-box-log.sh`, which writes
-volatile logs to `/tmp/neto/sing-box.log`; LuCI exposes that file through the
+sing-box process logs are not forwarded to OpenWrt `logread`. `/etc/init.d/zakop`
+starts sing-box through `/usr/share/zakop/run-sing-box-log.sh`, which writes
+volatile logs to `/tmp/zakop/sing-box.log`; LuCI exposes that file through the
 `Logs` page. The default path is under `/tmp` to avoid persistent flash/overlay
 writes.
 
@@ -253,15 +253,15 @@ Real DNS config:
 - Block rules answer locally with NXDOMAIN/NODATA/block response.
 - AAAA for FakeIP domains returns NODATA when `filter_aaaa_for_fakeip=1`.
 
-dnsmasq uses `addsubnet=32` so `netod` can recover original LAN client IP
-through EDNS Client Subnet. `netod` strips ECS before forwarding queries to
+dnsmasq uses `addsubnet=32` so `zakopd` can recover original LAN client IP
+through EDNS Client Subnet. `zakopd` strips ECS before forwarding queries to
 sing-box/public resolvers.
 
 With `manage_dnsmasq=1`, the nftables table also redirects plain IPv4 LAN
 TCP/UDP port 53 traffic to the router's dnsmasq. This covers clients behind an
 AP/bridge which select a different classic DNS server. Encrypted DNS (DoH/DoT)
 is not intercepted. At service startup, nft/TProxy and the dnsmasq upstream
-switch are enabled only after an end-to-end real-DNS probe through netod and
+switch are enabled only after an end-to-end real-DNS probe through zakopd and
 sing-box succeeds.
 
 Network and configuration reload triggers use rc.common's normal procd-aware
@@ -307,7 +307,7 @@ Protocol/port matchers:
 - `list dst_port '443'`
 
 Ports accept single value or `start-end`. If ports are set and `proto` is empty,
-neto generates explicit TCP and UDP rules.
+zakop generates explicit TCP and UDP rules.
 
 Port/proto matchers are packet/nft-only. DNS/domain/FakeIP matching never sees
 ports.
@@ -345,20 +345,20 @@ Provider types:
 Providers download plain text lists into persistent storage:
 
 ```text
-/etc/neto/provider-cache/
+/etc/zakop/provider-cache/
 ```
 
 OpenWrt `/var` may be backed by volatile `/tmp`, so default provider caches
-must not live under `/var/lib/neto/providers/`. Legacy `local_path` metadata
-that points under `/var/lib/neto/providers/` is treated as the default cache and
+must not live under `/var/lib/zakop/providers/`. Legacy `local_path` metadata
+that points under `/var/lib/zakop/providers/` is treated as the default cache and
 resolved to:
 
 ```text
-/etc/neto/provider-cache/
+/etc/zakop/provider-cache/
 ```
 
 If a referenced provider cache is still missing, compile warns and treats that
-provider reference as empty. Startup must continue so `netod` and `sing-box`
+provider reference as empty. Startup must continue so `zakopd` and `sing-box`
 can run with the remaining valid policy.
 
 Manual update:
@@ -367,8 +367,8 @@ On a fresh install, built-in provider names exist after importing provider
 presets from the LuCI Providers page.
 
 ```sh
-netod providers update
-netod providers update telegram_ipv4
+zakopd providers update
+zakopd providers update telegram_ipv4
 ```
 
 Provider source defaults to `url`. URL providers use `curl` to download raw
@@ -376,7 +376,7 @@ text. Domain provider text may contain one or more whitespace-separated domains
 per line. A domain provider entry matches the root domain and subdomains.
 Providers may also set `source=script` and an absolute `script_path`; the script
 returns domains/IP/CIDRs on stdout or writes the final result to
-`NETO_PROVIDER_OUTPUT`, then `netod` normalizes and writes the standard provider
+`ZAKOP_PROVIDER_OUTPUT`, then `zakopd` normalizes and writes the standard provider
 cache. Script providers keep `type=domain|ip`, because `type` describes the
 output data consumed by rules.
 
@@ -398,18 +398,18 @@ allow-domains. This creates only reusable `provider` sections with
 
 - Cloudflare IPv4: `https://www.cloudflare.com/ips-v4/`
 - Telegram IPv4: `https://core.telegram.org/resources/cidr.txt`
-- Akamai IPv4: `/usr/share/neto/providers/akamai-ipv4.sh`
-- AWS CDN IPv4 (`CLOUDFRONT`, `S3`): `/usr/share/neto/providers/aws-ipv4.sh`
+- Akamai IPv4: `/usr/share/zakop/providers/akamai-ipv4.sh`
+- AWS CDN IPv4 (`CLOUDFRONT`, `S3`): `/usr/share/zakop/providers/aws-ipv4.sh`
 - AWS Full IPv4 (`AMAZON`, `EC2`, `GLOBALACCELERATOR`):
-  `/usr/share/neto/providers/aws-full-ipv4.sh`
-- AWS Full EU IPv4: `/usr/share/neto/providers/aws-full-eu-ipv4.sh`
-- Google Cloud Europe IPv4: `/usr/share/neto/providers/google-cloud-eu-ipv4.sh`
+  `/usr/share/zakop/providers/aws-full-ipv4.sh`
+- AWS Full EU IPv4: `/usr/share/zakop/providers/aws-full-eu-ipv4.sh`
+- Google Cloud Europe IPv4: `/usr/share/zakop/providers/google-cloud-eu-ipv4.sh`
 
 AWS Full is intentionally separate because routing broad AWS infrastructure may
 affect ping to games hosted on Amazon/AWS servers.
 
 Built-in JSON provider scripts use `jq` when it is already installed and fall
-back to POSIX tools otherwise. `jq` is not a required neto dependency.
+back to POSIX tools otherwise. `jq` is not a required zakop dependency.
 
 IP provider update keeps only valid IPv4 address/CIDR entries. IPv6 entries are
 ignored.
@@ -438,7 +438,7 @@ Creatable outbound types:
 Imported nodes and subscription nodes are ordinary outbound sections and are
 selectable by rules.
 
-Outbound latency tests are management-only. `netod outbounds latency` starts
+Outbound latency tests are management-only. `zakopd outbounds latency` starts
 a temporary sing-box Clash API controller on localhost and queries the native
 URLTest delay endpoint for each selected custom outbound. It discards a warm-up
 pass, reports the measured pass, and exits after producing JSON. It does not
@@ -461,12 +461,12 @@ General contains service status, DNS settings, `routing_mode`, start/stop and
 autostart. Advanced contains low-level listeners, dnsmasq, LAN, TProxy, FakeIP
 range and nft settings.
 
-Rules hides `dns_mode` and writes `auto`. DNS behavior is derived by netod.
+Rules hides `dns_mode` and writes `auto`. DNS behavior is derived by zakopd.
 
 ## Forbidden Changes
 
 - Do not add IPv6 routing in v1.
-- Do not implement transparent TCP/UDP proxy in `netod`.
+- Do not implement transparent TCP/UDP proxy in `zakopd`.
 - Do not implement custom FakeIP allocator.
 - Do not add fw3/iptables support.
 - Do not route WAN/inbound/router-self/non-LAN prerouting traffic.
