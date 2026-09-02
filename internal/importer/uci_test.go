@@ -49,6 +49,35 @@ config main 'main'
 	}
 }
 
+func TestApplyManualNodePreservesUnicodeFlagLabelInUCI(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "zakop")
+	if err := os.WriteFile(path, []byte("config main 'main'\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	nodes := []Node{{
+		Raw: "trojan://secret@example.com:443#%F0%9F%87%AB%F0%9F%87%AE%D0%A4%D0%B8%D0%BD%D0%BB%D1%8F%D0%BD%D0%B4%D0%B8%D1%8F",
+		Outbound: config.Outbound{
+			Enabled:  true,
+			Type:     "trojan",
+			Label:    "🇫🇮Финляндия",
+			Server:   "example.com",
+			Port:     443,
+			Password: "secret",
+			TLS:      true,
+		},
+	}}
+	if _, err := ApplyNodes(nodes, ApplyOptions{ConfigPath: path, Source: "manual"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Outbounds) != 1 || cfg.Outbounds[0].Label != "🇫🇮Финляндия" {
+		t.Fatalf("Unicode flag label was not preserved: %+v", cfg.Outbounds)
+	}
+}
+
 func TestApplyManualNodesUsesUniqueTags(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "zakop")
 	if err := os.WriteFile(path, []byte(`

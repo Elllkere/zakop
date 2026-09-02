@@ -102,7 +102,8 @@ for path in \
 	/www/luci-static/resources/view/zakop \
 	/www/luci-static/resources/view/zakop_* \
 	/www/luci-static/resources/zakop \
-	/www/luci-static/resources/zakop_*
+	/www/luci-static/resources/zakop_* \
+	/www/luci-static/resources/zakop-assets
 do
 	[ -d "$path" ] && rm -rf "$path"
 done

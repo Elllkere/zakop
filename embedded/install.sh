@@ -662,6 +662,7 @@ fix_luci_permissions() {
 	for path in \
 		/www/luci-static/resources/zakop \
 		/www/luci-static/resources/zakop_* \
+		/www/luci-static/resources/zakop-assets \
 		/www/luci-static/resources/view/zakop \
 		/www/luci-static/resources/view/zakop_*
 	do
@@ -670,6 +671,7 @@ fix_luci_permissions() {
 	for path in \
 		/www/luci-static/resources/zakop/*.js \
 		/www/luci-static/resources/zakop_*/*.js \
+		/www/luci-static/resources/zakop-assets/* \
 		/www/luci-static/resources/view/zakop/*.js \
 		/www/luci-static/resources/view/zakop_*/*.js \
 		/usr/share/luci/menu.d/luci-app-zakop.json \
@@ -715,6 +717,7 @@ install_files() {
 	for path in \
 		/www/luci-static/resources/zakop \
 		/www/luci-static/resources/zakop_* \
+		/www/luci-static/resources/zakop-assets \
 		/www/luci-static/resources/view/zakop \
 		/www/luci-static/resources/view/zakop_*
 	do

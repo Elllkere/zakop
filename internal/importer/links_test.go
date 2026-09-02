@@ -53,6 +53,16 @@ func TestParseTrojanLink(t *testing.T) {
 	}
 }
 
+func TestParseLinkPreservesUnicodeFlagLabel(t *testing.T) {
+	node, err := ParseLink("vless://a3482e88-686a-4a58-8126-99c9df64b060@example.com:443#%F0%9F%87%AB%F0%9F%87%AE%D0%A4%D0%B8%D0%BD%D0%BB%D1%8F%D0%BD%D0%B4%D0%B8%D1%8F")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.Outbound.Label != "🇫🇮Финляндия" {
+		t.Fatalf("got label %q, want Unicode flag label", node.Outbound.Label)
+	}
+}
+
 func TestParseBase64Subscription(t *testing.T) {
 	body := "trojan://secret@example.com:443#Trojan\nvless://a3482e88-686a-4a58-8126-99c9df64b060@example.com:443#VLESS"
 	encoded := base64.StdEncoding.EncodeToString([]byte(body))

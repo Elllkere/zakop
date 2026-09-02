@@ -4,6 +4,74 @@
 'require ui';
 'require uci';
 
+var countryFlagFontName = 'Twemoji Country Flags';
+var countryFlagFontURL = '/luci-static/resources/zakop-assets/TwemojiCountryFlags-0.1.8.woff2';
+var countryFlagStyleID = 'zakop-country-flag-emoji';
+
+function colorEmojiContext() {
+	var canvas = document.createElement('canvas');
+	var context;
+
+	canvas.width = 1;
+	canvas.height = 1;
+	context = canvas.getContext('2d');
+	if (!context)
+		return null;
+
+	context.textBaseline = 'top';
+	context.font = '100px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+	context.scale(0.01, 0.01);
+	return context;
+}
+
+function emojiPixel(context, value, color) {
+	context.clearRect(0, 0, 100, 100);
+	context.fillStyle = color;
+	context.fillText(value, 0, 0);
+	return context.getImageData(0, 0, 1, 1).data.join(',');
+}
+
+function supportsColorEmoji(value) {
+	var context, light, dark;
+
+	try {
+		context = colorEmojiContext();
+		if (!context)
+			return false;
+		light = emojiPixel(context, value, '#fff');
+		dark = emojiPixel(context, value, '#000');
+		return dark == light && dark.indexOf('0,0,0,') != 0;
+	} catch (err) {
+		return false;
+	}
+}
+
+function enableCountryFlagEmoji() {
+	var style;
+
+	if (typeof document == 'undefined' || document.getElementById(countryFlagStyleID))
+		return;
+	if (supportsColorEmoji('🇨🇭'))
+		return;
+
+	style = document.createElement('style');
+	style.id = countryFlagStyleID;
+	style.textContent = '@font-face {' +
+		'font-family:"' + countryFlagFontName + '";' +
+		'unicode-range:U+1F1E6-1F1FF,U+1F3F4,U+E0062-E0063,U+E0065,U+E0067,' +
+		'U+E006C,U+E006E,U+E0073-E0074,U+E0077,U+E007F;' +
+		'src:url("' + countryFlagFontURL + '") format("woff2");' +
+		'font-display:swap}' +
+		'html.zakop-country-flags body,' +
+		'html.zakop-country-flags input,' +
+		'html.zakop-country-flags button,' +
+		'html.zakop-country-flags select,' +
+		'html.zakop-country-flags option{' +
+		'font-family:"' + countryFlagFontName + '",system-ui,-apple-system,"Segoe UI",sans-serif}';
+	document.head.appendChild(style);
+	document.documentElement.classList.add('zakop-country-flags');
+}
+
 function commandSuccess(res, message) {
 	if (!res || res.code)
 		throw new Error((res && (res.stderr || res.stdout)) || message);
@@ -120,6 +188,7 @@ function updateRulesTab() {
 }
 
 function syncRulesTab() {
+	enableCountryFlagEmoji();
 	updateRulesTab();
 
 	if (typeof window != 'undefined') {
@@ -130,5 +199,6 @@ function syncRulesTab() {
 
 return baseclass.extend({
 	applyAndRestart: applyAndRestart,
+	enableCountryFlagEmoji: enableCountryFlagEmoji,
 	syncRulesTab: syncRulesTab
 });

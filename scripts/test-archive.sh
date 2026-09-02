@@ -75,6 +75,14 @@ esac
 	echo "missing versioned LuCI helper modules" >&2
 	exit 1
 }
+[ -s "$TMP/files/www/luci-static/resources/zakop-assets/TwemojiCountryFlags-0.1.8.woff2" ] || {
+	echo "missing LuCI country flag emoji font" >&2
+	exit 1
+}
+[ -s "$TMP/files/www/luci-static/resources/zakop-assets/LICENSE.md" ] || {
+	echo "missing LuCI country flag emoji font license" >&2
+	exit 1
+}
 grep -Fq "\"path\": \"$ui_namespace/outbounds\"" \
 	"$TMP/files/usr/share/luci/menu.d/luci-app-zakop.json" || {
 	echo "LuCI menu does not reference versioned outbounds view" >&2
