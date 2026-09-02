@@ -17,6 +17,9 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"s.addremove = true",
 		"s.modaltitle = _('Outbound details')",
 		"s.sectiontitle = function(section_id)",
+		"s.renderRowActions = function(section_id)",
+		"form.GridSection.prototype.renderRowActions.apply(this, arguments)",
+		"actions.insertBefore(testButton, actions.firstChild)",
 		"s.renderSectionAdd = function()",
 		"ui.addValidator(nameEl, 'uciname'",
 		"function outboundTagExists(tag)",
@@ -49,10 +52,13 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"method",
 		"password",
 		"handleOutboundLatencyTest: function()",
-		"runOutboundLatencyTests: function(targets)",
+		"handleSingleOutboundLatencyTest: function(section_id)",
+		"outboundLatencyTarget: function(section_id)",
+		"runOutboundLatencyTests: function(targets, preserveMissing)",
+		"return this.runOutboundLatencyTests([ target ], true)",
 		"fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency', target.tag ])",
 		"outboundLatencyFailure: function(target, error)",
-		"updateOutboundLatencyResults: function(report)",
+		"updateOutboundLatencyResults: function(report, preserveMissing)",
 		"setOutboundLatencyStatus: function(text, className, title, tag)",
 		"setOutboundLatencyButton: function(testing, current, total)",
 		"_('Testing %d/%d…').format(current, total)",
@@ -61,6 +67,9 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"'data-zakop-latency-tag': outboundTag(section_id)",
 		"'style': 'font-size:1.1em;font-weight:600;white-space:nowrap'",
 		"'data-zakop-latency-button': '1'",
+		"'data-zakop-latency-row-button': tag",
+		"self.handleSingleOutboundLatencyTest(section_id)",
+		"setOutboundLatencyRowButtons: function(testing, activeTag)",
 		"self.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag)",
 		"_('Test latency')",
 		"cellResult.latency_ms",
@@ -208,6 +217,15 @@ func TestOutboundsLuCITableOnlySectionNameTypeAddressPortAndLatency(t *testing.T
 		if strings.Contains(block, "o.editable = true") {
 			t.Fatalf("field %q should be read-only text in the table and editable through the modal:\n%s", needle, block)
 		}
+	}
+	latencyStart := strings.Index(s, "form.DummyValue, '_latency', _('URLTest delay')")
+	latencyEnd := strings.Index(s[latencyStart+1:], "\n\t\to = s.option(")
+	if latencyStart < 0 || latencyEnd < 0 {
+		t.Fatalf("could not find outbound latency table block:\n%s", s)
+	}
+	latencyBlock := s[latencyStart : latencyStart+1+latencyEnd]
+	if strings.Contains(latencyBlock, "data-zakop-latency-row-button") || strings.Contains(latencyBlock, "E('button'") {
+		t.Fatalf("latency column must only show the result; its test button belongs in row actions:\n%s", latencyBlock)
 	}
 	for _, needle := range []string{
 		"form.Value, 'label'",

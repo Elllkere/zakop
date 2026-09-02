@@ -447,6 +447,7 @@ return view.extend({
 
 		this.latencyTesting = true;
 		this.setOutboundLatencyButton(true);
+		this.setOutboundLatencyRowButtons(true);
 
 		return this.handleSaveCommitConfig()
 			.then(L.bind(function() {
@@ -475,7 +476,46 @@ return view.extend({
 			}, this));
 	},
 
-	runOutboundLatencyTests: function(targets) {
+	handleSingleOutboundLatencyTest: function(section_id) {
+		var target;
+
+		this.latencyTesting = true;
+		this.setOutboundLatencyButton(true);
+		this.setOutboundLatencyRowButtons(true, outboundTag(section_id));
+
+		return this.handleSaveCommitConfig()
+			.then(L.bind(function() {
+				target = this.outboundLatencyTarget(section_id);
+				if (!target)
+					throw new Error(_('Outbound not found'));
+
+				// map.save() redraws the GridSection, so update the newly
+				// rendered row before starting the test.
+				this.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag);
+				this.setOutboundLatencyRowButtons(true, target.tag);
+				return this.runOutboundLatencyTests([ target ], true);
+			}, this))
+			.then(L.bind(function(report) {
+				this.updateOutboundLatencyResults(report, true);
+				ui.addNotification(null, E('p', {}, _('Latency test completed.')), 'info');
+			}, this));
+	},
+
+	outboundLatencyTarget: function(section_id) {
+		var tag = outboundTag(section_id);
+
+		if (tag == '' || isReservedTag(tag) || uci.get('zakop', section_id) == null)
+			return null;
+
+		return {
+			tag: tag,
+			label: String(uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || tag),
+			server: String(uci.get('zakop', section_id, 'server') || uci.get('zakop', section_id, 'address') || '') +
+				(uci.get('zakop', section_id, 'port') ? ':' + uci.get('zakop', section_id, 'port') : '')
+		};
+	},
+
+	runOutboundLatencyTests: function(targets, preserveMissing) {
 		var report = { target: '', results: [] };
 		var self = this;
 		var chain = Promise.resolve();
@@ -483,6 +523,7 @@ return view.extend({
 		targets.forEach(function(target, index) {
 			chain = chain.then(function() {
 				self.setOutboundLatencyButton(true, index + 1, targets.length);
+				self.setOutboundLatencyRowButtons(true, target.tag);
 				self.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag);
 
 				return fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency', target.tag ])
@@ -509,7 +550,7 @@ return view.extend({
 						report.results.push(self.outboundLatencyFailure(target, err.message || err));
 					})
 					.then(function() {
-						self.updateOutboundLatencyResults(report);
+						self.updateOutboundLatencyResults(report, preserveMissing);
 					});
 			});
 		});
@@ -537,6 +578,17 @@ return view.extend({
 		}
 	},
 
+	setOutboundLatencyRowButtons: function(testing, activeTag) {
+		var buttons = document.querySelectorAll('[data-zakop-latency-row-button]');
+
+		for (var i = 0; i < buttons.length; i++) {
+			var active = activeTag && buttons[i].getAttribute('data-zakop-latency-row-button') == activeTag;
+
+			buttons[i].disabled = testing ? true : null;
+			buttons[i].textContent = testing && active ? _('Testing…') : _('Test');
+		}
+	},
+
 	setOutboundLatencyStatus: function(text, className, title, tag) {
 		var cells = document.querySelectorAll('[data-zakop-latency-tag]');
 
@@ -549,7 +601,7 @@ return view.extend({
 		}
 	},
 
-	updateOutboundLatencyResults: function(report) {
+	updateOutboundLatencyResults: function(report, preserveMissing) {
 		var results = Array.isArray(report && report.results) ? report.results : [];
 		var byTag = Object.create(null);
 		var best = null;
@@ -570,7 +622,9 @@ return view.extend({
 			var cell = cells[j];
 			var cellResult = byTag[cell.getAttribute('data-zakop-latency-tag')];
 
-			if (!cellResult) {
+			if (!cellResult && preserveMissing) {
+				continue;
+			} else if (!cellResult) {
 				cell.textContent = _('Not tested');
 				cell.className = '';
 				cell.title = '';
@@ -606,6 +660,37 @@ return view.extend({
 			var tag = String(uci.get('zakop', section_id, 'tag') || section_id || '').trim();
 			return tag != 'proxy_default';
 		};
+		s.renderRowActions = function(section_id) {
+			var actionsCell = form.GridSection.prototype.renderRowActions.apply(this, arguments);
+			var actions = actionsCell.lastElementChild;
+			var tag = outboundTag(section_id);
+			var testButton = E('button', {
+				'type': 'button',
+				'title': _('Test latency'),
+				'class': 'btn cbi-button cbi-button-neutral',
+				'data-zakop-latency-row-button': tag,
+				'disabled': self.latencyTesting ? true : null,
+				'click': function(ev) {
+					ev.preventDefault();
+					ev.stopPropagation();
+
+					return self.handleSingleOutboundLatencyTest(section_id).then(function() {
+						self.latencyTesting = false;
+						self.setOutboundLatencyButton(false);
+						self.setOutboundLatencyRowButtons(false);
+					}, function(err) {
+						self.latencyTesting = false;
+						self.setOutboundLatencyButton(false);
+						self.setOutboundLatencyRowButtons(false);
+						self.setOutboundLatencyStatus(_('Failed'), 'label danger', err.message || err, tag);
+						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+					});
+				}
+			}, self.latencyTesting ? _('Testing…') : _('Test'));
+
+			actions.insertBefore(testButton, actions.firstChild);
+			return actionsCell;
+		};
 		s.renderSectionAdd = function() {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
 			var latencyButton;
@@ -627,9 +712,11 @@ return view.extend({
 					return self.handleOutboundLatencyTest().then(function() {
 						self.latencyTesting = false;
 						self.setOutboundLatencyButton(false);
+						self.setOutboundLatencyRowButtons(false);
 					}, function(err) {
 						self.latencyTesting = false;
 						self.setOutboundLatencyButton(false);
+						self.setOutboundLatencyRowButtons(false);
 						self.setOutboundLatencyStatus(_('Not tested'), '', err.message || err);
 						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
 					});

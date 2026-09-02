@@ -318,9 +318,11 @@ config outbound_pool 'main_pool'
 Кнопка `Test latency` на странице Outbounds проверяет все серверы через их
 реальные proxy profiles с помощью URLTest самого sing-box. Результат выводится
 в отдельном столбце таблицы Outbounds, лучший доступный сервер подсвечивается.
+Кнопка `Проверить` в строке запускает URLTest только для выбранного outbound.
 LuCI проверяет серверы отдельными последовательными запросами: таймаут одного
 сервера не останавливает остальные. Для CLI доступна та же проверка:
-`zakopd outbounds latency`.
+`zakopd outbounds latency` для всех или `zakopd outbounds latency <tag>` для
+одного outbound.
 
 ## Providers
 

@@ -96,8 +96,10 @@ Each proxy rule independently uses its selected custom outbound. Outbound
 selectors have no empty `Auto` choice: the first custom outbound is selected
 initially, and LuCI does not create a proxy rule when none exists.
 
-The Outbounds page can test every proxy profile and sort the results by HTTP
-latency. The same JSON report is available with `zakopd outbounds latency`.
+The Outbounds page can test every proxy profile or one selected outbound and
+sort the results by HTTP latency. The same JSON report is available with
+`zakopd outbounds latency` for all outbounds or
+`zakopd outbounds latency <tag>` for one outbound.
 
 The page also supports strict-priority failover pools. zakopd checks members in
 list order, selects the first reachable outbound, moves to the next member when
