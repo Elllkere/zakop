@@ -15,33 +15,6 @@
 | LuCI `/admin/services/neto` | LuCI `/admin/services/zakop` |
 | `NETO_*` | `ZAKOP_*` |
 
-Перед началом убедитесь, что репозиторий GitHub уже переименован в `zakop` и в
-последнем Release опубликован asset `zakop-openwrt-embedded.tar.gz`. Не запускайте
-старый `neto` и новый `zakop` одновременно: они используют одинаковые DNS- и
-TProxy-порты.
-
-## Переименование GitHub-репозитория
-
-До установки на роутер:
-
-1. В GitHub откройте **Settings → General → Repository name**, задайте `zakop`
-   и подтвердите переименование.
-2. В локальном clone обновите remote:
-
-   ```sh
-   git remote set-url origin git@github.com:Elllkere/zakop.git
-   git remote -v
-   ```
-
-3. При желании переименуйте локальный рабочий каталог из его родительской
-   директории: `mv neto zakop`.
-4. После merge изменений создайте новый tag/Release. Workflow должен загрузить
-   `zakop-openwrt-embedded.tar.gz`, `.sha256` и `zakop-version.txt`.
-
-GitHub обычно сохраняет redirect со старого URL, но installer и self-updater
-намеренно используют только новый URL `elllkere/zakop`. Go module path также
-изменён на `github.com/elllkere/zakop`.
-
 ## Резервная копия
 
 На роутере сохраните конфигурацию и persistent data:
