@@ -14,6 +14,14 @@ log_dir="${log_file%/*}"
 child_pid=""
 log_enabled=0
 
+# BEGIN NETWORKDEBUG
+debug_snapshot() {
+	"$zakopd_bin" network-debug "$1" >/dev/null 2>&1 &
+	# Keep the child's exit status when called immediately after wait.
+	return "${2:-0}"
+}
+# END NETWORKDEBUG
+
 rotate_log() {
 	case "$log_max_bytes" in
 		""|*[!0-9]*)
@@ -114,6 +122,9 @@ while :; do
 	start_singbox
 	if ! wait_with_child "$health_grace"; then
 		wait "$child_pid"
+		# BEGIN NETWORKDEBUG
+		debug_snapshot singbox-exit "$?"
+		# END NETWORKDEBUG
 		exit $?
 	fi
 
@@ -125,6 +136,9 @@ while :; do
 		else
 			health_failures=$((health_failures + 1))
 			if [ "$health_failures" -ge "$health_failures_max" ]; then
+				# BEGIN NETWORKDEBUG
+				debug_snapshot dns-health
+				# END NETWORKDEBUG
 				log_message "real DNS health check failed $health_failures times; restarting sing-box"
 				restart_for_health=1
 				kill "$child_pid" 2>/dev/null || true
@@ -142,5 +156,8 @@ while :; do
 	fi
 
 	wait "$child_pid"
+	# BEGIN NETWORKDEBUG
+	debug_snapshot singbox-exit "$?"
+	# END NETWORKDEBUG
 	exit $?
 done

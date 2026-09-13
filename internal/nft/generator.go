@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elllkere/zakop/internal/buildmode"
 	"github.com/elllkere/zakop/internal/config"
 	"github.com/elllkere/zakop/internal/policy"
 	"github.com/elllkere/zakop/internal/proxyroute"
@@ -19,7 +20,17 @@ type Input struct {
 }
 
 func Generate(in Input) (string, error) {
+	return generate(in, true)
+}
+
+// diagnostics is used by regression tests to compare routing with instrumentation
+// removed. The compile-time buildmode constant eliminates every diagnostic branch
+// (including its strings) from production regardless of this argument.
+func generate(in Input, diagnostics bool) (string, error) {
 	cfg := in.Config
+	if buildmode.NetworkDebug && diagnostics {
+		cfg.Main.NFTCounters = true
+	}
 	directClients := collectClients(cfg, "direct")
 	proxyClients := collectClients(cfg, "proxy")
 	lanSubnets := policy.NormalizeIPv4CIDRs(policy.MustIPv4CIDRs(cfg.Main.LANSubnets...))
@@ -32,6 +43,18 @@ func Generate(in Input) (string, error) {
 
 	var b strings.Builder
 	b.WriteString("table inet zakop {\n")
+	if buildmode.NetworkDebug && diagnostics {
+		b.WriteString("\tcounter debug_tproxy_success { }\n")
+		b.WriteString("\tcounter debug_tcp_attempt { }\n")
+		b.WriteString("\tcounter debug_udp_attempt { }\n")
+		for _, target := range proxyTargets {
+			b.WriteString(fmt.Sprintf("\tcounter debug_success_%s { }\n", target.Chain))
+		}
+		b.WriteString("\tchain debug_late_prerouting {\n")
+		b.WriteString("\t\ttype filter hook prerouting priority 300; policy accept;\n")
+		b.WriteString(fmt.Sprintf("\t\tct status dnat meta mark %s counter comment \"debug_dnat_marked_late\"\n", cfg.Main.Mark))
+		b.WriteString("\t}\n")
+	}
 	writeSet(&b, "lan_subnets4", policy.CIDRStrings(lanSubnets))
 	writeSet(&b, "reserved4", policy.CIDRStrings(reserved4))
 	writeSet(&b, "direct_clients4", directClients)
@@ -50,6 +73,12 @@ func Generate(in Input) (string, error) {
 	b.WriteString("\t\treturn\n")
 	b.WriteString("\t}\n")
 	b.WriteString("\tchain from_lan {\n")
+	if buildmode.NetworkDebug && diagnostics {
+		// Observation only: an upstream service may legitimately set this mark.
+		// Do not turn this into a bypass or alter the packet's mark.
+		b.WriteString(fmt.Sprintf("\t\tmeta mark %s counter comment \"debug_already_marked\"\n", cfg.Main.Mark))
+		b.WriteString(fmt.Sprintf("\t\tct status dnat meta mark %s counter comment \"debug_dnat_marked\"\n", cfg.Main.Mark))
+	}
 	if cfg.Main.ManageDNSMasq {
 		// Plain DNS must reach the later nat redirect even in global mode or
 		// for a force-proxy client. Otherwise TProxy would consume it first.
@@ -75,11 +104,26 @@ func Generate(in Input) (string, error) {
 			return "", err
 		}
 	}
+	if buildmode.NetworkDebug && diagnostics {
+		b.WriteString("\t\tcounter comment \"debug_unmatched_direct\"\n")
+	}
 	b.WriteString("\t\treturn\n")
 	b.WriteString("\t}\n")
 	for _, target := range proxyTargets {
 		b.WriteString(fmt.Sprintf("\tchain %s {\n", target.Chain))
-		b.WriteString(fmt.Sprintf("\t\tmeta l4proto { tcp, udp }%s meta mark set %s tproxy ip to 127.0.0.1:%d accept\n", counter(cfg), cfg.Main.Mark, target.Port))
+		if buildmode.NetworkDebug && diagnostics {
+			b.WriteString("\t\tmeta l4proto tcp counter name debug_tcp_attempt comment \"debug_tcp_attempt\"\n")
+			b.WriteString("\t\tmeta l4proto udp counter name debug_udp_attempt comment \"debug_udp_attempt\"\n")
+		}
+		success := ""
+		if buildmode.NetworkDebug && diagnostics {
+			success = " counter name debug_tproxy_success counter name debug_success_" + target.Chain
+		}
+		b.WriteString(fmt.Sprintf("\t\tmeta l4proto { tcp, udp }%s meta mark set %s tproxy ip to 127.0.0.1:%d%s accept\n", counter(cfg), cfg.Main.Mark, target.Port, success))
+		if buildmode.NetworkDebug && diagnostics {
+			// TProxy fails with NFT_BREAK (not a terminal drop) if no socket exists.
+			b.WriteString("\t\tcounter comment \"debug_tproxy_fallthrough\"\n")
+		}
 		b.WriteString("\t\treturn\n")
 		b.WriteString("\t}\n")
 	}

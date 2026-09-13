@@ -6,8 +6,21 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="${TMPDIR:-/tmp}/zakop-pack.$$"
 ARCHIVE_ROOT="$WORK_DIR/zakop"
-ARCHIVE="$OUT_DIR/zakop-openwrt-embedded.tar.gz"
 VERSION="${ZAKOP_VERSION:-$(git -C "$ROOT_DIR" describe --tags --always --dirty 2>/dev/null || echo dev)}"
+BUILD_TAGS=""
+BUILD_FLAVOR="production"
+ARCHIVE="$OUT_DIR/zakop-openwrt-embedded.tar.gz"
+case "${1:-}" in
+	"") ;;
+	--network-debug)
+		BUILD_TAGS="networkdebug"
+		BUILD_FLAVOR="network-debug"
+		ARCHIVE="$OUT_DIR/zakop-openwrt-network-debug.tar.gz"
+		VERSION="$VERSION-network-debug"
+		;;
+	*) echo "usage: $0 [--network-debug]" >&2; exit 1 ;;
+esac
+[ "$#" -le 1 ] || { echo "too many arguments" >&2; exit 1; }
 
 cleanup() {
 	rm -rf "$WORK_DIR"
@@ -30,7 +43,7 @@ build_zakopd() {
 		GOARM="$goarm" \
 		GOMIPS="$gomips" \
 		CGO_ENABLED=0 \
-		go build -buildvcs=false -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "$dest" ./cmd/zakopd
+		go build -tags "$BUILD_TAGS" -buildvcs=false -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "$dest" ./cmd/zakopd
 	)
 	chmod 0755 "$dest"
 }
@@ -52,6 +65,25 @@ cp -R "$ROOT_DIR/embedded/files" "$ARCHIVE_ROOT/files"
 cp "$ROOT_DIR/embedded/install.sh" "$ARCHIVE_ROOT/install.sh"
 cp "$ROOT_DIR/embedded/uninstall.sh" "$ARCHIVE_ROOT/uninstall.sh"
 cp "$ROOT_DIR/embedded/upgrade.sh" "$ARCHIVE_ROOT/upgrade.sh"
+if [ "$BUILD_FLAVOR" = "network-debug" ]; then
+	cp -R "$ROOT_DIR/embedded/networkdebug/files/." "$ARCHIVE_ROOT/files/"
+	mkdir -p "$ARCHIVE_ROOT/diagnostics"
+	cp "$ROOT_DIR/scripts/dnat-stress.py" "$ROOT_DIR/scripts/test-dnat-netns.py" \
+		"$ROOT_DIR/scripts/router-network-check.sh" "$ROOT_DIR/docs/NETWORK_AUDIT.md" \
+		"$ROOT_DIR/docs/NETWORK_DIAGNOSTICS.md" "$ROOT_DIR/docs/NETWORK_VALIDATION.md" "$ARCHIVE_ROOT/diagnostics/"
+fi
+# Strip entire diagnostic shell blocks from production, not runtime branches.
+for script in "$ARCHIVE_ROOT/files/etc/init.d/zakop" "$ARCHIVE_ROOT/files/usr/share/zakop/run-sing-box-log.sh"; do
+	awk -v flavor="$BUILD_FLAVOR" '
+		/# BEGIN NETWORKDEBUG/ { skip = (flavor == "production"); next }
+		/# END NETWORKDEBUG/ { skip = 0; next }
+		!skip { print }
+	' "$script" > "$script.rendered"
+	# Preserve executable permissions inherited from the source file.
+	cat "$script.rendered" > "$script"
+	rm -f "$script.rendered"
+done
+printf '%s\n' "$BUILD_FLAVOR" > "$ARCHIVE_ROOT/zakop-build-flavor.txt"
 printf '%s\n' "$VERSION" > "$ARCHIVE_ROOT/zakop-version.txt"
 chmod 0755 "$ARCHIVE_ROOT/install.sh" "$ARCHIVE_ROOT/uninstall.sh" "$ARCHIVE_ROOT/upgrade.sh"
 

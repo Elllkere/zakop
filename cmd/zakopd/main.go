@@ -110,6 +110,10 @@ func run(args []string) error {
 		return errors.New("missing command")
 	}
 
+	if handled, err := runBuildCommand(args); handled {
+		return err
+	}
+
 	switch args[0] {
 	case "version":
 		fmt.Printf("zakopd %s\n", version)
@@ -342,7 +346,7 @@ func parseProviderOptions(args []string) (providerOptions, error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: zakopd <version|check|compile|apply|status|debug|run|ready|import-uri|subscriptions|providers|download|outbounds|logs> [options]")
+	fmt.Fprintln(os.Stderr, "usage: zakopd <version|check|compile|apply|status|debug|run|ready|import-uri|subscriptions|providers|download|outbounds|logs"+buildUsage+"> [options]")
 }
 
 func commandCheck(opts options) error {

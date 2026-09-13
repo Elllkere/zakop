@@ -3,6 +3,7 @@
 set -eu
 
 PURGE=0
+rm -f /etc/hotplug.d/iface/95-zakop-debug
 if [ "${1:-}" = "--purge" ]; then
 	PURGE=1
 fi

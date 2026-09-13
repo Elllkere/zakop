@@ -39,6 +39,38 @@ done
 	echo "missing default UCI config" >&2
 	exit 1
 }
+flavor="$(cat "$TMP/zakop-build-flavor.txt")"
+case "$flavor" in production|network-debug) ;; *) echo "invalid build flavor" >&2; exit 1 ;; esac
+if [ "$flavor" = network-debug ]; then
+for diagnostic in dnat-stress.py test-dnat-netns.py router-network-check.sh NETWORK_AUDIT.md NETWORK_DIAGNOSTICS.md NETWORK_VALIDATION.md; do
+	[ -s "$TMP/diagnostics/$diagnostic" ] || {
+		echo "missing diagnostic artifact: $diagnostic" >&2
+		exit 1
+	}
+done
+[ -f "$TMP/files/etc/hotplug.d/iface/95-zakop-debug" ] || {
+	echo "missing diagnostic hotplug hook" >&2
+	exit 1
+}
+grep -q 'network-debug watch' "$TMP/files/etc/init.d/zakop"
+grep -q 'debug_snapshot dns-health' "$TMP/files/usr/share/zakop/run-sing-box-log.sh"
+else
+	[ ! -d "$TMP/diagnostics" ]
+	[ ! -f "$TMP/files/etc/hotplug.d/iface/95-zakop-debug" ]
+	if grep -Eq 'network-debug|debug_snapshot|NETWORKDEBUG|debug_network' "$TMP/files/etc/init.d/zakop" "$TMP/files/usr/share/zakop/run-sing-box-log.sh"; then
+		echo "production shell contains diagnostic code" >&2; exit 1
+	fi
+fi
+for target in linux-amd64 linux-arm64 linux-armv7 linux-mips-softfloat linux-mipsle-softfloat; do
+	if [ "$flavor" = production ]; then
+		if grep -aqE 'debug_tproxy_success|debug_dnat_marked|network-debug|internal/netdebug' "$TMP/bin/$target/zakopd"; then
+			echo "production binary contains diagnostic code: $target" >&2; exit 1
+		fi
+	else
+		grep -aq 'debug_tproxy_success' "$TMP/bin/$target/zakopd"
+		grep -aq 'internal/netdebug' "$TMP/bin/$target/zakopd"
+	fi
+done
 [ -x "$TMP/install.sh" ] || {
 	echo "missing install.sh" >&2
 	exit 1

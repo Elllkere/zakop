@@ -1,0 +1,4 @@
+#!/bin/sh
+# Read-only observations, including custom WAN/LAN names. No service reload here.
+[ "$ACTION" = "ifdown" ] || exit 0
+/usr/bin/zakopd network-debug ifdown >/dev/null 2>&1 &

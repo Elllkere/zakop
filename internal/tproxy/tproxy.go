@@ -68,7 +68,10 @@ func PlanCleanup(ruleShow, routeShow string, cfg Config) []Command {
 }
 
 func RulePresent(ruleShow string, cfg Config) bool {
-	marks := markForms(cfg.Mark)
+	wantMark, err := strconv.ParseUint(cfg.Mark, 0, 32)
+	if err != nil {
+		return false
+	}
 	table := tableString(cfg)
 	for _, raw := range strings.Split(ruleShow, "\n") {
 		line := strings.TrimSpace(raw)
@@ -78,16 +81,33 @@ func RulePresent(ruleShow string, cfg Config) bool {
 		if i := strings.Index(line, ":"); i >= 0 {
 			line = strings.TrimSpace(line[i+1:])
 		}
-		if !strings.Contains(line, "fwmark ") {
+		fields := strings.Fields(line)
+		// A restricted or inverted rule is not our unconditional source rule.
+		if len(fields) < 6 || fields[0] != "from" || fields[1] != "all" || fields[2] != "fwmark" || (fields[4] != "lookup" && fields[4] != "table") {
 			continue
 		}
-		if !(strings.Contains(line, " lookup "+table) || strings.Contains(line, " table "+table)) {
+		if len(fields) != 6 && !(len(fields) == 8 && (fields[6] == "proto" || fields[6] == "protocol")) {
 			continue
 		}
-		for _, mark := range marks {
-			if strings.Contains(line, "fwmark "+mark) {
-				return true
+		markOK, tableOK := false, false
+		for i := 0; i+1 < len(fields); i++ {
+			switch fields[i] {
+			case "fwmark":
+				parts := strings.Split(fields[i+1], "/")
+				value, e := strconv.ParseUint(parts[0], 0, 32)
+				mask := uint64(0xffffffff)
+				if len(parts) == 2 {
+					mask, err = strconv.ParseUint(parts[1], 0, 32)
+				} else {
+					err = nil
+				}
+				markOK = len(parts) <= 2 && e == nil && err == nil && value == wantMark && mask == 0xffffffff
+			case "lookup", "table":
+				tableOK = fields[i+1] == table
 			}
+		}
+		if markOK && tableOK {
+			return true
 		}
 	}
 	return false
@@ -96,8 +116,14 @@ func RulePresent(ruleShow string, cfg Config) bool {
 func RoutePresent(routeShow string) bool {
 	for _, raw := range strings.Split(routeShow, "\n") {
 		line := strings.TrimSpace(raw)
-		if strings.HasPrefix(line, "local default ") && strings.Contains(line, " dev lo") {
-			return true
+		fields := strings.Fields(line)
+		if len(fields) < 4 || fields[0] != "local" || (fields[1] != "default" && fields[1] != "0.0.0.0/0") {
+			continue
+		}
+		for i := 2; i+1 < len(fields); i++ {
+			if fields[i] == "dev" && fields[i+1] == "lo" {
+				return true
+			}
 		}
 	}
 	return false
@@ -115,16 +141,4 @@ func RouteTableMissing(output string, exitCode int) bool {
 
 func tableString(cfg Config) string {
 	return strconv.Itoa(cfg.Table)
-}
-
-func markForms(mark string) []string {
-	mark = strings.TrimSpace(mark)
-	if mark == "" {
-		return nil
-	}
-	forms := []string{mark}
-	if strings.HasPrefix(mark, "0x") || strings.HasPrefix(mark, "0X") {
-		forms = append(forms, strings.TrimPrefix(strings.TrimPrefix(mark, "0x"), "0X"))
-	}
-	return forms
 }

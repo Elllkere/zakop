@@ -723,6 +723,9 @@ install_files() {
 	do
 		[ -d "$path" ] && rm -rf "$path"
 	done
+	# Remove an obsolete owned hook when switching archive flavors; a diagnostic
+	# archive installs its version again below. No observer remains on downgrade.
+	rm -f /etc/hotplug.d/iface/95-zakop-debug
 	cp -R "$WORK_DIR/files/." /
 	fix_luci_permissions
 	chmod 0755 /etc/init.d/zakop

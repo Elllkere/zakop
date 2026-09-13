@@ -38,6 +38,7 @@ jobs:
       - name: Validate
         run: |
           go test ./...
+          go test -tags networkdebug ./...
           sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/zakop/*.sh embedded/files/usr/share/zakop/providers/*.sh
           jq empty embedded/files/usr/share/luci/menu.d/*.json
           jq empty embedded/files/usr/share/rpcd/acl.d/*.json
@@ -50,7 +51,10 @@ jobs:
         run: |
           ./embedded/pack.sh
           ./scripts/test-archive.sh
+          ./embedded/pack.sh --network-debug
+          ./scripts/test-archive.sh dist/zakop-openwrt-network-debug.tar.gz
           sha256sum dist/zakop-openwrt-embedded.tar.gz > dist/zakop-openwrt-embedded.tar.gz.sha256
+          sha256sum dist/zakop-openwrt-network-debug.tar.gz > dist/zakop-openwrt-network-debug.tar.gz.sha256
           printf '%s\n' "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" > dist/zakop-version.txt
 
       - name: Create or update release
@@ -62,12 +66,16 @@ jobs:
             gh release upload "$TAG" \
               dist/zakop-openwrt-embedded.tar.gz \
               dist/zakop-openwrt-embedded.tar.gz.sha256 \
+              dist/zakop-openwrt-network-debug.tar.gz \
+              dist/zakop-openwrt-network-debug.tar.gz.sha256 \
               dist/zakop-version.txt \
               --clobber
           else
             gh release create "$TAG" \
               dist/zakop-openwrt-embedded.tar.gz \
               dist/zakop-openwrt-embedded.tar.gz.sha256 \
+              dist/zakop-openwrt-network-debug.tar.gz \
+              dist/zakop-openwrt-network-debug.tar.gz.sha256 \
               dist/zakop-version.txt \
               --title "$TAG" \
               --generate-notes \

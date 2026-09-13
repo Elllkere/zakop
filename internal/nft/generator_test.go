@@ -17,7 +17,7 @@ func TestGenerateOrder(t *testing.T) {
 		{Name: "proxy", IP: "192.168.8.100", Policy: "proxy"},
 	}
 	cfg.Rules = []config.Rule{providerRule("cloudflare", 100, "proxy")}
-	out, err := Generate(Input{
+	out, err := generateForTest(Input{
 		Config:    cfg,
 		RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")},
 	})
@@ -48,7 +48,7 @@ func TestGenerateReturnsDNATConnectionsBeforeProxyClientPolicy(t *testing.T) {
 	cfg.Clients = []config.Client{
 		{Name: "rdp_host", IP: "192.168.8.100", Policy: "proxy"},
 	}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestGenerateUsesSetForManyProviderCIDRs(t *testing.T) {
 			provider = append(provider, "11."+itoa(a)+"."+itoa(b)+".0/24")
 		}
 	}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs(provider...)}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs(provider...)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestGenerateInlineIPCIDRRule(t *testing.T) {
 			"8.8.8.8",
 		},
 	}}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("8.8.8.8")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("8.8.8.8")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestGenerateBlockIPCIDRRuleDropsPacket(t *testing.T) {
 			"8.8.8.8",
 		},
 	}}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("8.8.8.8")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("8.8.8.8")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestGenerateIPCIDRRuleStopsDroppingWhenActionChangesFromBlock(t *testing.T)
 	}}
 	ruleCIDRs := map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("8.8.8.8")}
 
-	blocked, err := Generate(Input{Config: cfg, RuleCIDRs: ruleCIDRs})
+	blocked, err := generateForTest(Input{Config: cfg, RuleCIDRs: ruleCIDRs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func TestGenerateIPCIDRRuleStopsDroppingWhenActionChangesFromBlock(t *testing.T)
 	}
 
 	cfg.Rules[0].Action = "direct"
-	direct, err := Generate(Input{Config: cfg, RuleCIDRs: ruleCIDRs})
+	direct, err := generateForTest(Input{Config: cfg, RuleCIDRs: ruleCIDRs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestGenerateIPCIDRRuleStopsDroppingWhenActionChangesFromBlock(t *testing.T)
 
 	cfg.Rules[0].Action = "proxy"
 	cfg.Rules[0].Outbound = "test"
-	proxy, err := Generate(Input{Config: cfg, RuleCIDRs: ruleCIDRs})
+	proxy, err := generateForTest(Input{Config: cfg, RuleCIDRs: ruleCIDRs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestGenerateMixedDomainAndProviderIPRule(t *testing.T) {
 		DomainContains: []string{"youtube"},
 		IPProviders:    []string{"cloudflare"},
 	}}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestGenerateProviderRuleTCPDstPort(t *testing.T) {
 	rule.Proto = []string{"tcp"}
 	rule.DstPorts = []string{"443"}
 	cfg.Rules = []config.Rule{rule}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestGenerateProviderRuleUDPDstPort(t *testing.T) {
 	rule.Proto = []string{"udp"}
 	rule.DstPorts = []string{"443"}
 	cfg.Rules = []config.Rule{rule}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestGenerateProviderRuleTCPUDPDstPort(t *testing.T) {
 	rule.Proto = []string{"tcp", "udp"}
 	rule.DstPorts = []string{"443"}
 	cfg.Rules = []config.Rule{rule}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestGenerateProviderRuleDefaultsPortsToTCPUDP(t *testing.T) {
 	rule := providerRule("cloudflare", 100, "proxy")
 	rule.DstPorts = []string{"443"}
 	cfg.Rules = []config.Rule{rule}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestGenerateProviderRulePortRange(t *testing.T) {
 	rule.Proto = []string{"tcp"}
 	rule.DstPorts = []string{"1000-2000"}
 	cfg.Rules = []config.Rule{rule}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +309,7 @@ func TestGenerateMixedDomainAndProviderPortRule(t *testing.T) {
 		Proto:          []string{"tcp"},
 		DstPorts:       []string{"443"},
 	}}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestGenerateCounters(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.NFTCounters = true
 	cfg.Rules = []config.Rule{providerRule("cloudflare", 100, "proxy")}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestGenerateProviderPortRuleCounters(t *testing.T) {
 	rule.Proto = []string{"tcp"}
 	rule.DstPorts = []string{"443"}
 	cfg.Rules = []config.Rule{rule}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +359,7 @@ func TestGenerateCustomModeNoGlobalCatchAll(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.NFTCounters = false
 	cfg.Main.RoutingMode = "custom"
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestGenerateSimpleModeUsesSimpleIPRule(t *testing.T) {
 	cfg.Main.NFTCounters = false
 	cfg.Main.RoutingMode = "simple"
 	cfg.Main.SimpleRule = providerRule("simple_ips", 100, "proxy")
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{0: policy.MustIPv4CIDRs("1.1.1.0/24")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestGenerateGlobalModeCatchAll(t *testing.T) {
 		{Name: "direct", IP: "192.168.8.50", Policy: "direct"},
 		{Name: "default", IP: "192.168.8.60", Policy: "default"},
 	}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +429,7 @@ func TestCustomClientDirectReturnsBeforeProxy(t *testing.T) {
 		DNSMode:        "auto",
 		DomainContains: []string{"example"},
 	}}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestCustomClientProxySourceRule(t *testing.T) {
 	cfg.Main.NFTCounters = false
 	cfg.Main.RoutingMode = "custom"
 	cfg.Clients = []config.Client{{Name: "pc", IP: "192.168.8.100", Policy: "proxy"}}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +462,7 @@ func TestGlobalClientDefaultUsesCatchAll(t *testing.T) {
 	cfg.Main.NFTCounters = false
 	cfg.Main.RoutingMode = "global"
 	cfg.Clients = []config.Client{{Name: "pc", IP: "192.168.8.60", Policy: "default"}}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +481,7 @@ func TestGenerateLANSubnetsSet(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.NFTCounters = false
 	cfg.Main.LANSubnets = []string{"192.168.10.0/24", "192.168.8.0/24", "192.168.8.0/24"}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +500,7 @@ func TestGenerateLANIfaceGuard(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.NFTCounters = false
 	cfg.Main.LANIfaces = []string{"br-lan", "lan0"}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +513,7 @@ func TestGenerateRedirectsLANPlainDNSIntoDNSMasq(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.NFTCounters = false
 	cfg.Main.LANIfaces = []string{"br-lan", "lan0"}
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -539,7 +539,7 @@ func TestGenerateRedirectsLANPlainDNSIntoDNSMasq(t *testing.T) {
 func TestGenerateDoesNotRedirectDNSWhenDNSMasqManagementDisabled(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.ManageDNSMasq = false
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +552,7 @@ func TestGenerateGlobalNonLANReturnsBeforeCatchAll(t *testing.T) {
 	cfg := testConfig()
 	cfg.Main.NFTCounters = false
 	cfg.Main.RoutingMode = "global"
-	out, err := Generate(Input{Config: cfg})
+	out, err := generateForTest(Input{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,7 +570,7 @@ func TestGenerateProviderRulePriorityDirectBeforeProxy(t *testing.T) {
 		providerRule("direct_google", 10, "direct"),
 		providerRule("proxy_all", 20, "proxy"),
 	}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
 		0: policy.MustIPv4CIDRs("8.8.8.0/24"),
 		1: policy.MustIPv4CIDRs("0.0.0.0/0"),
 	}})
@@ -591,7 +591,7 @@ func TestGenerateProviderRulePriorityProxyBeforeDirect(t *testing.T) {
 		providerRule("proxy_youtube", 10, "proxy"),
 		providerRule("direct_google", 20, "direct"),
 	}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
 		0: policy.MustIPv4CIDRs("8.8.8.0/24"),
 		1: policy.MustIPv4CIDRs("8.8.8.0/24"),
 	}})
@@ -621,7 +621,7 @@ func TestGenerateRoutesDifferentIPRulesToDifferentTProxyPorts(t *testing.T) {
 		{Name: "second", Enabled: true, Priority: 200, Action: "proxy", Outbound: "second", DNSMode: "real_ip", IPCIDRs: []string{"8.8.8.8"}},
 	}
 
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
 		0: policy.MustIPv4CIDRs("1.1.1.1"),
 		1: policy.MustIPv4CIDRs("8.8.8.8"),
 	}})
@@ -650,7 +650,7 @@ func TestGenerateProviderPortRulePriorityStable(t *testing.T) {
 	first.DstPorts = []string{"443"}
 	second := providerRule("second_plain", 20, "direct")
 	cfg.Rules = []config.Rule{first, second}
-	out, err := Generate(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
+	out, err := generateForTest(Input{Config: cfg, RuleCIDRs: map[int][]*net.IPNet{
 		0: policy.MustIPv4CIDRs("1.1.1.0/24"),
 		1: policy.MustIPv4CIDRs("8.8.8.0/24"),
 	}})
@@ -703,3 +703,5 @@ func testConfig() config.Config {
 	}}
 	return cfg
 }
+
+func generateForTest(in Input) (string, error) { return generate(in, false) }
