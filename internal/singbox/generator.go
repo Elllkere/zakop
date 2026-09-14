@@ -341,7 +341,8 @@ func generateOutbounds(cfg config.Config) ([]any, error) {
 	}
 
 	add(map[string]any{"type": "direct", "tag": config.BuiltinDirectOutbound})
-	add(map[string]any{"type": "block", "tag": config.BuiltinBlockedOutbound})
+	// Blocking is enforced by zakop DNS policy and nftables before sing-box.
+	// The unused legacy block outbound is no longer supported by sing-box 1.13.
 	for _, outbound := range cfg.EnabledCustomOutbounds() {
 		add(encodeOutbound(outbound))
 	}

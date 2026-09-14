@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/elllkere/zakop/internal/config"
+	"github.com/elllkere/zakop/internal/proxyroute"
 	"github.com/elllkere/zakop/internal/tproxy"
 )
 
@@ -43,12 +44,25 @@ func Summary(cfg config.Config) string {
 		fmt.Sprintf("fakeip_dns_listener: %s", listenerStatus(cfg.Main.SingBoxDNSFakeIPAddr())),
 		fmt.Sprintf("real_direct_dns_listener: %s", listenerStatus(cfg.Main.SingBoxDNSRealDirectAddr())),
 		fmt.Sprintf("real_proxy_dns_listener: %s", listenerStatus(cfg.Main.SingBoxDNSRealProxyAddr())),
-		fmt.Sprintf("tproxy_listener: %s", listenerStatus("127.0.0.1:"+strconv.Itoa(cfg.Main.TProxyPort))),
+		fmt.Sprintf("tproxy_listener: %s", tproxyListenerStatus(cfg, listenerStatus)),
 	}
 	if len(cfg.OutboundPools) > 0 {
 		lines = append(lines, fmt.Sprintf("pool_controller: %s", listenerStatus(cfg.Main.PoolController)))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func tproxyListenerStatus(cfg config.Config, probe func(string) string) string {
+	targets := proxyroute.Targets(cfg)
+	if len(targets) == 0 {
+		return "not_required"
+	}
+	for _, target := range targets {
+		if probe("127.0.0.1:"+strconv.Itoa(target.Port)) != "present" {
+			return "missing"
+		}
+	}
+	return "present"
 }
 
 func OutboundsSummary(cfg config.Config) string {

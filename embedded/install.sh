@@ -477,14 +477,14 @@ write_singbox_check_config() {
     { "type": "tproxy", "tag": "tproxy-in", "listen": "127.0.0.1", "listen_port": 16001 }
   ],
   "outbounds": [
-    { "type": "direct", "tag": "direct" },
-    { "type": "block", "tag": "blocked" }
+    { "type": "direct", "tag": "direct" }
   ],
   "route": {
     "rules": [
       { "protocol": "dns", "action": "hijack-dns" }
     ],
-    "final": "direct"
+    "final": "direct",
+    "default_domain_resolver": "local"
   }
 }
 JSON
@@ -493,20 +493,47 @@ JSON
 singbox_compatible() {
 	local bin="$1"
 	local check_cfg="$WORK_DIR/sing-box-check.json"
+	local check_log="$WORK_DIR/sing-box-check.log"
 	local ver
 
 	[ -x "$bin" ] || return 1
 	ver="$("$bin" version 2>/dev/null | first_version || true)"
-	[ -n "$ver" ] || return 1
-	version_ge "$ver" "$MIN_SINGBOX_VERSION" || return 1
+	if [ -z "$ver" ]; then
+		log "$bin: could not determine sing-box version"
+		return 1
+	fi
+	if ! version_ge "$ver" "$MIN_SINGBOX_VERSION"; then
+		log "$bin: sing-box $ver is older than required $MIN_SINGBOX_VERSION"
+		return 1
+	fi
 
 	write_singbox_check_config "$check_cfg"
-	"$bin" check -c "$check_cfg" >/dev/null 2>&1
+	if ! "$bin" check -c "$check_cfg" >"$check_log" 2>&1; then
+		log "$bin: sing-box $ver compatibility check failed"
+		cat "$check_log" >&2
+		return 1
+	fi
+	return 0
 }
 
-set_fresh_singbox_path() {
+set_selected_singbox_path() {
 	local path="$1"
+	local configured=""
 	if command -v uci >/dev/null 2>&1; then
+		configured="$(uci -q get zakop.main.singbox_bin || true)"
+		[ "$configured" = "$path" ] && return 0
+		# Preserve a working custom binary, but repair stale installer-owned paths
+		# on upgrades and retries after a partially completed installation.
+		case "$configured" in
+			""|/usr/bin/sing-box|"$MANAGED_SINGBOX") ;;
+			*)
+				if singbox_compatible "$configured"; then
+					log "keeping compatible custom sing-box $configured"
+					return 0
+				fi
+				;;
+		esac
+		log "setting singbox_bin to $path"
 		uci set zakop.main.singbox_bin="$path"
 		uci commit zakop
 	else
@@ -698,7 +725,6 @@ ensure_lan_subnet_config() {
 
 install_files() {
 	local arch="$1"
-	local config_created=0
 	local path
 
 	[ -x "$WORK_DIR/bin/$arch/zakopd" ] || die "archive does not contain zakopd for $arch"
@@ -708,8 +734,6 @@ install_files() {
 
 	if [ -f /etc/config/zakop ]; then
 		rm -f "$WORK_DIR/files/etc/config/zakop"
-	else
-		config_created=1
 	fi
 
 	# Remove only zakop-owned LuCI namespaces from previous releases. The archive
@@ -743,20 +767,17 @@ install_files() {
 
 	if singbox_compatible /usr/bin/sing-box; then
 		log "using compatible system sing-box"
-		if [ "$config_created" -eq 1 ]; then
-			set_fresh_singbox_path "/usr/bin/sing-box"
-		fi
+		set_selected_singbox_path "/usr/bin/sing-box"
 	elif [ -x "$WORK_DIR/bin/$arch/sing-box" ]; then
 		log "installing managed sing-box to $MANAGED_SINGBOX"
 		atomic_install "$WORK_DIR/bin/$arch/sing-box" "$MANAGED_SINGBOX"
 		if ! singbox_compatible "$MANAGED_SINGBOX"; then
 			die "managed sing-box exists but is not compatible"
 		fi
-		if [ "$config_created" -eq 1 ]; then
-			set_fresh_singbox_path "$MANAGED_SINGBOX"
-		fi
+		set_selected_singbox_path "$MANAGED_SINGBOX"
 	elif singbox_compatible "$MANAGED_SINGBOX"; then
 		log "using migrated managed sing-box"
+		set_selected_singbox_path "$MANAGED_SINGBOX"
 	else
 		die "no compatible system sing-box and no managed sing-box for $arch in archive"
 	fi
@@ -802,12 +823,13 @@ zakop_runtime_ready() {
 		"dns_listener: present" \
 		"fakeip_dns_listener: present" \
 		"real_direct_dns_listener: present" \
-		"real_proxy_dns_listener: present" \
-		"tproxy_listener: present"
+		"real_proxy_dns_listener: present"
 	do
 		printf '%s\n' "$status" | grep -Fqx "$expected" || return 1
 	done
-	return 0
+	# No TProxy inbounds are generated until a custom outbound exists.
+	printf '%s\n' "$status" | grep -Fqx "tproxy_listener: present" ||
+		printf '%s\n' "$status" | grep -Fqx "tproxy_listener: not_required"
 }
 
 restart_zakop_safely() {
@@ -853,6 +875,8 @@ restart_zakop_safely() {
 		sleep 1
 	done
 
+	log "service readiness timed out; current status:"
+	/usr/bin/zakopd status >&2 || true
 	/etc/init.d/zakop stop >/dev/null 2>&1 || true
 	die "service did not become ready after update; networking was returned to direct mode"
 }

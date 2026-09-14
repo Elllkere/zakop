@@ -1,11 +1,47 @@
 package status
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/elllkere/zakop/internal/config"
 )
+
+func TestTProxyListenerStatus(t *testing.T) {
+	cfg := config.Defaults()
+	if got := tproxyListenerStatus(cfg, func(string) string {
+		t.Fatal("empty configuration must not require a listener")
+		return "missing"
+	}); got != "not_required" {
+		t.Fatalf("empty configuration: %s", got)
+	}
+	cfg.Outbounds = []config.Outbound{
+		{Enabled: true, Tag: "one", Type: "trojan"},
+		{Enabled: true, Tag: "two", Type: "trojan"},
+	}
+	cfg.OutboundPools = []config.OutboundPool{{Tag: "pool", Outbounds: []string{"one", "two"}}}
+	for _, missing := range []string{"", "127.0.0.1:16001", "127.0.0.1:16002", "127.0.0.1:16003"} {
+		var probed []string
+		got := tproxyListenerStatus(cfg, func(addr string) string {
+			probed = append(probed, addr)
+			if addr == missing {
+				return "missing"
+			}
+			return "present"
+		})
+		want := "present"
+		if missing != "" {
+			want = "missing"
+		}
+		if got != want {
+			t.Fatalf("missing=%q: got %s, want %s", missing, got, want)
+		}
+		if missing == "" && !reflect.DeepEqual(probed, []string{"127.0.0.1:16001", "127.0.0.1:16002", "127.0.0.1:16003"}) {
+			t.Fatalf("must check every outbound and pool listener: %v", probed)
+		}
+	}
+}
 
 func TestLocalRouteStatusMissingTable(t *testing.T) {
 	got := localRouteStatusResult("Error: ipv4: FIB table does not exist.\nDump terminated\n", 2, true)

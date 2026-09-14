@@ -2,6 +2,9 @@ package singbox
 
 import (
 	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -65,12 +68,53 @@ func TestGenerateUsesModernFakeIPServer(t *testing.T) {
 func TestGenerateBuiltinOutbounds(t *testing.T) {
 	cfg := config.Defaults()
 	direct := generatedOutbound(t, cfg, "direct")
-	blocked := generatedOutbound(t, cfg, "blocked")
 	if direct["type"] != "direct" {
 		t.Fatalf("unexpected direct outbound: %+v", direct)
 	}
-	if blocked["type"] != "block" {
-		t.Fatalf("unexpected blocked outbound: %+v", blocked)
+	out, err := Generate(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc Config
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range doc.Outbounds {
+		outbound := item.(map[string]any)
+		if outbound["type"] == "block" || outbound["type"] == "dns" || outbound["tag"] == "blocked" {
+			t.Fatalf("legacy special outbound generated: %+v", outbound)
+		}
+	}
+}
+
+func TestGenerateWithSingBoxBinary(t *testing.T) {
+	bin := os.Getenv("ZAKOP_TEST_SINGBOX")
+	if bin == "" {
+		t.Skip("set ZAKOP_TEST_SINGBOX to validate with a real sing-box binary")
+	}
+	cfg := config.Defaults()
+	cfg.Outbounds = []config.Outbound{{Enabled: true, Tag: "test", Type: "vless", Server: "127.0.0.1", Port: 443, UUID: "a3482e88-686a-4a58-8126-99c9df64b060"}}
+	for _, generate := range []struct {
+		name string
+		fn   func() ([]byte, error)
+	}{
+		{"service", func() ([]byte, error) { return Generate(cfg) }},
+		{"update", func() ([]byte, error) { return GenerateProxyClient(cfg, "test", 18080) }},
+		{"latency", func() ([]byte, error) { return GenerateLatencyClient(cfg, []string{"test"}, 18081) }},
+	} {
+		t.Run(generate.name, func(t *testing.T) {
+			raw, err := generate.fn()
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "sing-box.json")
+			if err := os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if output, err := exec.Command(bin, "check", "-c", path).CombinedOutput(); err != nil {
+				t.Fatalf("sing-box check: %v\n%s", err, output)
+			}
+		})
 	}
 }
 

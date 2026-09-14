@@ -245,8 +245,10 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
 ## Current Outbound Model
 
 - Built-in outbound tags are `direct` and `blocked`.
-- Built-ins are generated for sing-box and must not be created as
-  `config outbound` sections.
+- Built-ins must not be created as `config outbound` sections. Only `direct`
+  is generated as a sing-box outbound; blocking is enforced by zakop DNS policy
+  and nftables before sing-box. Do not generate legacy `block`/`dns` outbounds,
+  which were removed in sing-box 1.13.
 - Creatable outbound types are `vless`, `hysteria2`, `shadowsocks`, and
   `trojan`.
 - Custom outbounds use stable UCI section/tag IDs plus editable `label`.
