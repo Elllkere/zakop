@@ -29,26 +29,33 @@ LuCI Outbounds page создает только real proxy profiles:
 - `shadowsocks`
 - `trojan`
 
-Outbounds table остается компактной:
+Подключения отображаются компактными карточками в адаптивной сетке.
+На карточке видны название, протокол, адрес с портом и задержка URLTest;
+доступны проверка, редактирование и удаление. Число карточек в ряду зависит
+от ширины экрана. Поиск фильтрует подключения по имени, адресу, тегу и
+протоколу; фильтр сохраняется при перерисовке формы. По умолчанию карточки
+следуют порядку секций UCI (стандартный порядок). Можно выбрать сортировку
+по имени, без учёта флагов/значков перед названием, или по задержке: сначала меньшая измеренная задержка, затем
+подключения без результата и с ошибкой. Если успешных измерений ещё нет,
+выбор этого режима не меняет порядок. Сортировка и результаты сохраняются
+при перерисовке формы в пределах открытой страницы; порядок UCI не меняется.
 
-- label/name;
-- type;
-- address/server;
-- port.
-
-Protocol-specific fields находятся в edit dialog.
+Protocol-specific fields находятся в edit dialog. Pools и subscriptions
+остаются отдельными секциями.
 
 ## Latency Test
 
 LuCI Outbounds page exposes `Test latency`. The test starts temporary sing-box
 with a Clash API controller bound to localhost. It calls sing-box's native
 `GET /proxies/{tag}/delay` URLTest endpoint for every real outbound and writes
-the result into the read-only `URLTest delay` column of the Outbounds table.
+the result into the read-only delay indicator on each outbound card.
 The fastest successful result is highlighted; failed nodes show the error in
-the cell tooltip. LuCI sends one named test request at a time and updates the
-table incrementally, so a large subscription cannot exceed the XHR timeout as
-one monolithic request. A timeout or failure affects only that outbound and
-does not stop the remaining tests.
+the indicator tooltip. LuCI polls one background `-progress` job with short
+direct CGI-IO calls and updates cards incrementally. A transient polling
+timeout retries the same job without starting another test. A transport failure
+is shown as an interrupted test; completed proxy measurements are preserved.
+No-op UCI commits are skipped before testing so they do not reload the service. A timeout or failure affects only
+that outbound and does not stop the remaining tests.
 
 The all-outbounds CLI command processes large subscriptions in batches of 32,
 with four requests in parallel inside each batch. The temporary test does not
@@ -170,7 +177,7 @@ zakopd import-uri -file /tmp/zakop-import.txt
 Imported nodes:
 
 - carry `option imported '1'`;
-- are visible in Outbounds table;
+- are visible as cards on the Outbounds page;
 - are selectable in Rules outbound dropdown;
 - are ordinary editable outbounds.
 
@@ -180,7 +187,6 @@ Subscription config:
 
 ```uci
 config subscription 'my_sub'
-	option enabled '1'
 	option label 'My subscription'
 	option url 'https://example.com/subscription'
 	option auto_update '0'
@@ -189,6 +195,13 @@ config subscription 'my_sub'
 	option update_via 'direct'
 ```
 
+Subscriptions have no enable/disable switch; `auto_update` controls only the
+automatic schedule. Legacy `enabled` values are ignored. In LuCI, the URL is
+shown as text in the table and edited through Edit. The Update button saves
+the current settings, including a newly added subscription, before downloading;
+a separate Save & Apply is not required. Update is available in both the row
+actions and the edit modal.
+
 Manual update:
 
 ```sh
@@ -196,7 +209,7 @@ zakopd subscriptions update my_sub
 /etc/init.d/zakop restart
 ```
 
-Omit the name in the CLI to update every enabled subscription:
+Omit the name in the CLI to update every subscription:
 
 ```sh
 zakopd subscriptions update
@@ -229,7 +242,6 @@ router-self traffic. It starts temporary sing-box local mixed proxy and uses
 
 ```uci
 config subscription 'my_sub'
-	option enabled '1'
 	option url 'https://example.com/subscription'
 	option auto_update '1'
 	option update_schedule 'interval'

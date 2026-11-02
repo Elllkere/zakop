@@ -3,6 +3,10 @@
 'require fs';
 'require ui';
 'require uci';
+'require rpc';
+'require zakop.i18n as zakopI18n';
+
+var _ = zakopI18n.translate;
 
 var countryFlagFontName = 'Twemoji Country Flags';
 var countryFlagFontURL = '/luci-static/resources/zakop-assets/TwemojiCountryFlags-0.1.8.woff2';
@@ -108,42 +112,103 @@ function showApplyError(err) {
 	]);
 }
 
+// CGI-IO avoids rpcd's file.exec buffering and the shared RPC XHR batch.
+// Only the short start/status commands run in CGI; the test stays detached.
+function runJob(action, args, progress) {
+	var id, failures = 0, deadline = Date.now() + 30 * 60 * 1000;
+	function call(params) {
+		return fs.exec_direct('/usr/share/zakop/luci-job.sh', params, 'text');
+	}
+	function contextualError(label, err) {
+		return new Error(label.format(err && err.message ? err.message : String(err)));
+	}
+	function wait(milliseconds) {
+		return new Promise(function(resolve) { window.setTimeout(resolve, milliseconds); });
+	}
+	function poll() {
+		return call([ 'status-direct', id ]).then(function(output) {
+			failures = 0;
+			output = String(output || '');
+			var newline = output.indexOf('\n');
+			var state = output.substring(0, newline);
+			var marker = '\n__ZAKOP_JOB_STDERR__\n';
+			var split = output.indexOf(marker, newline);
+			if (newline < 0 || split < 0 || (state != 'running' && !/^exit:\d+$/.test(state)))
+				throw new Error(_('Invalid background task response'));
+			var result = { code: 0, stdout: output.substring(newline + 1, split), stderr: output.substring(split + marker.length) };
+			if (progress)
+				progress(result.stdout);
+			if (state.indexOf('exit:') == 0) {
+				result.code = Number(state.substring(5));
+				return call([ 'remove', id ]).catch(function() {}).then(function() { return result; });
+			}
+			if (Date.now() > deadline)
+				throw new Error(_('Operation is still running. Check the logs.'));
+			return wait(1000).then(poll);
+		}, function(err) {
+			// A lost status reply does not mean the proxy failed. Resume polling
+			// the same job; never launch a second test on a transport timeout.
+			var message = String(err && err.message || err);
+			if (/timeout|timed out|network|failed to fetch/i.test(message) && ++failures <= 3 && Date.now() < deadline)
+				return wait(1500 * failures).then(poll);
+			throw contextualError(_('Reading background task status failed: %s'), err);
+		});
+	}
+	return call([ 'start', action ].concat(args || [])).then(function(output) {
+		id = String(output || '').trim();
+		if (!/^job\.[a-zA-Z0-9]+$/.test(id))
+			throw new Error(_('Invalid background task response'));
+		return poll();
+	}, function(err) {
+		throw contextualError(_('Starting background task failed: %s'), err);
+	});
+}
+
+// Commit the LuCI session's staged data, rather than the CLI's /tmp/.uci.
+var callCommit = rpc.declare({
+	object: 'uci', method: 'commit', params: [ 'config' ], reject: true
+});
+
+function commitConfig() {
+	return uci.changes().then(function(changes) {
+		// Even a no-op uci/commit emits config.change and can reload zakop.
+		if (changes && changes.zakop && changes.zakop.length)
+			return callCommit('zakop');
+	}).then(function() {
+		uci.unload('zakop');
+		return uci.load('zakop');
+	}).then(function() { return ui.changes.init(); });
+}
+
+function restart() {
+	return runJob('restart').then(function(res) {
+		return commandSuccess(res, _('Restart failed'));
+	});
+}
+
 function applyAndRestart() {
 	showApplyProgress();
 
-	return uci.apply()
-		.then(function() {
-			/*
-			 * LuCI 23.05 and 24.10 resolve uci.apply() immediately after
-			 * scheduling confirmation one second later. Keep this page alive
-			 * until that confirmation has completed, otherwise reload cancels
-			 * the timer and rpcd rolls the staged changes back.
-			 */
-			return new Promise(function(resolve) {
-				window.setTimeout(resolve, 2500);
-			});
-		})
-		.then(function() {
-			return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
-		})
-		.then(function(res) {
-			return commandSuccess(res, _('Restart failed'));
-		})
-		.then(function() {
-			return ui.changes.init();
-		})
+	// rpcd can return "No data" when Apply is called with no staged changes.
+	// This happens after action buttons have already committed the config.
+	return uci.changes().then(function(changes) {
+		var pending = Object.keys(changes || {}).some(function(name) {
+			return changes[name] && changes[name].length;
+		});
+		if (!pending)
+			return;
+		return uci.apply(60).then(function() {
+			// Older LuCI versions resolve before their scheduled confirmation.
+			return new Promise(function(resolve) { window.setTimeout(resolve, 2500); });
+		});
+	})
+		.then(restart)
+		.then(function() { return ui.changes.init(); })
 		.then(function() {
 			showApplySuccess();
-			return new Promise(function(resolve) {
-				window.setTimeout(resolve, 1000);
-			});
-		})
-		.then(function() {
 			window.location.reload();
 		})
-		.catch(function(err) {
-			showApplyError(err);
-		});
+		.catch(showApplyError);
 }
 
 function rulesTabVisible() {
@@ -187,18 +252,38 @@ function updateRulesTab() {
 	}
 }
 
+function translateTabs() {
+	var titles = { general: 'General', outbounds: 'Outbounds', rules: 'Rules',
+		clients: 'Clients', providers: 'Providers', advanced: 'Advanced', logs: 'Logs', debug: 'Debug' };
+	var links = document.querySelectorAll('a[href]');
+	for (var i = 0; i < links.length; i++) {
+		var match = String(links[i].getAttribute('href') || '').match(/\/admin\/services\/zakop\/([a-z]+)\/?(?:[?#].*)?$/);
+		if (match && titles[match[1]]) {
+			// Preserve theme icons and other elements inside navigation links.
+			for (var j = 0; j < links[i].childNodes.length; j++) {
+				if (links[i].childNodes[j].nodeType == 3 && links[i].childNodes[j].textContent.trim())
+					links[i].childNodes[j].textContent = _(titles[match[1]]);
+			}
+		}
+	}
+}
+
 function syncRulesTab() {
 	enableCountryFlagEmoji();
+	translateTabs();
 	updateRulesTab();
 
 	if (typeof window != 'undefined') {
 		window.setTimeout(updateRulesTab, 0);
-		window.setTimeout(updateRulesTab, 250);
+		window.setTimeout(function() { translateTabs(); updateRulesTab(); }, 250);
 	}
 }
 
 return baseclass.extend({
 	applyAndRestart: applyAndRestart,
+	runJob: runJob,
+	commitConfig: commitConfig,
+	restart: restart,
 	enableCountryFlagEmoji: enableCountryFlagEmoji,
 	syncRulesTab: syncRulesTab
 });

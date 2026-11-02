@@ -19,10 +19,10 @@ func TestLuCIConfigPagesRestartZakopAfterCommit(t *testing.T) {
 		"_('Applying configuration changes…')",
 		"_('Configuration changes applied.')",
 		"_('Failed to apply configuration changes.')",
-		"showApplyError(err);",
-		"return uci.apply()",
+		".catch(showApplyError)",
+		"return uci.apply(60)",
 		"window.setTimeout(resolve, 2500)",
-		"fs.exec('/etc/init.d/zakop', [ 'restart' ])",
+		"runJob('restart')",
 		"return ui.changes.init();",
 		"window.location.reload();",
 	} {

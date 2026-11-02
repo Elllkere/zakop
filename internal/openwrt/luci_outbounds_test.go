@@ -56,9 +56,9 @@ func TestOutboundsLuCIExposesNativeTypes(t *testing.T) {
 		"outboundLatencyTarget: function(section_id)",
 		"runOutboundLatencyTests: function(targets, preserveMissing)",
 		"return this.runOutboundLatencyTests([ target ], true)",
-		"fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency', target.tag ])",
+		"zakopUI.runJob('latency', args, progress)",
 		"outboundLatencyFailure: function(target, error)",
-		"updateOutboundLatencyResults: function(report, preserveMissing)",
+		"updateOutboundLatencyResults: function(report, preserveMissing, root)",
 		"setOutboundLatencyStatus: function(text, className, title, tag)",
 		"setOutboundLatencyButton: function(testing, current, total)",
 		"_('Testing %d/%d…').format(current, total)",
@@ -174,8 +174,7 @@ func TestOutboundActionsDoNotCreateSyntheticPoolTagChanges(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"uci.unload('zakop')",
-		"return ui.changes.init()",
+		"return zakopUI.commitConfig();",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("outbounds.js missing post-commit refresh %q:\n%s", want, s)

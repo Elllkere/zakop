@@ -1561,6 +1561,7 @@ config outbound 'updater'
 	option password 'secret'
 
 config subscription 'my_sub'
+	option enabled '0'
 	option label 'My subscription'
 	option url 'https://example.com/sub'
 	option auto_update '1'

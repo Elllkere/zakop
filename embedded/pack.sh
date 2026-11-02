@@ -100,7 +100,7 @@ UI_CACHE_KEY="$({
 UI_NAMESPACE="zakop_${UI_CACHE_KEY}"
 mv "$UI_VIEW_DIR" "$ARCHIVE_ROOT/files/www/luci-static/resources/view/$UI_NAMESPACE"
 mv "$UI_HELPER_DIR" "$ARCHIVE_ROOT/files/www/luci-static/resources/$UI_NAMESPACE"
-for file in "$ARCHIVE_ROOT/files/www/luci-static/resources/view/$UI_NAMESPACE"/*.js; do
+for file in "$ARCHIVE_ROOT/files/www/luci-static/resources/view/$UI_NAMESPACE"/*.js "$ARCHIVE_ROOT/files/www/luci-static/resources/$UI_NAMESPACE"/*.js; do
 	sed -i "s/'require zakop\./'require $UI_NAMESPACE./g" "$file"
 done
 sed -i "s#\"path\": \"zakop/#\"path\": \"$UI_NAMESPACE/#g" \

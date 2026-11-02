@@ -398,16 +398,9 @@ return view.extend({
 	},
 
 	handleSaveCommitConfig: function() {
-		return this.handleSave()
-			.then(function() {
-				return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
-			})
-			.then(function(res) {
-				if (res.code)
-					throw new Error(res.stderr || res.stdout || _('Commit failed'));
-
-				return uci.load('zakop');
-			});
+		return this.handleSave().then(function() {
+			return zakopUI.commitConfig();
+		});
 	},
 
 	handleSaveApply: function(ev) {
@@ -420,13 +413,13 @@ return view.extend({
 	handleProviderUpdate: function(section_id) {
 		return this.handleSaveCommitConfig()
 			.then(function() {
-				return fs.exec('/usr/bin/zakopd', [ 'providers', 'update', section_id ]);
+				return zakopUI.runJob('providers', [ section_id ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Update failed'));
 
-				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
+				return zakopUI.restart();
 			})
 			.then(function() {
 				window.location.reload();
@@ -453,7 +446,7 @@ return view.extend({
 			}, this))
 			.then(function(updateFailures) {
 				failures = updateFailures;
-				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
+				return zakopUI.restart();
 			})
 			.then(function(res) {
 				if (res.code)
@@ -472,7 +465,7 @@ return view.extend({
 		names.forEach(function(name, index) {
 			chain = chain.then(function() {
 				self.setProviderUpdateAllButton(true, index + 1, names.length);
-				return fs.exec('/usr/bin/zakopd', [ 'providers', 'update', name ])
+				return zakopUI.runJob('providers', [ name ])
 					.then(function(res) {
 						if (res.code)
 							failures.push({ name: name, error: res.stderr || res.stdout || _('Update failed') });
@@ -530,16 +523,10 @@ return view.extend({
 						if (ok === false)
 							throw new Error(_('Save failed'));
 
-						return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
-					})
-					.then(function(res) {
-						if (res.code)
-							throw new Error(res.stderr || res.stdout || _('Commit failed'));
-
-						return uci.load('zakop');
+						return zakopUI.commitConfig();
 					})
 					.then(function() {
-						return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
+						return zakopUI.restart();
 					})
 					.then(function() {
 						window.location.reload();

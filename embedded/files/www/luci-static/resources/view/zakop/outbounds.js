@@ -6,6 +6,7 @@
 'require view';
 'require zakop.i18n as zakopI18n';
 'require zakop.ui as zakopUI';
+'require zakop.outboundcards as outboundCards';
 
 var importPath = '/tmp/zakop-import.txt';
 var _ = zakopI18n.translate;
@@ -210,8 +211,7 @@ function normalizeOutbounds() {
 
 function normalizeSubscriptions() {
 	uci.sections('zakop', 'subscription', function(section, sid) {
-		if (uci.get('zakop', sid, 'enabled') == null)
-			uci.set('zakop', sid, 'enabled', '1');
+		uci.unset('zakop', sid, 'enabled');
 
 		if (uci.get('zakop', sid, 'label') == null)
 			uci.set('zakop', sid, 'label', sid);
@@ -252,19 +252,9 @@ return view.extend({
 	},
 
 	handleSaveCommitConfig: function() {
-		return this.handleSave()
-			.then(function() {
-				return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
-			})
-			.then(function(res) {
-				if (res.code)
-					throw new Error(res.stderr || res.stdout || _('Commit failed'));
-
-				uci.unload('zakop');
-				return uci.load('zakop').then(function() {
-					return ui.changes.init();
-				});
-			});
+		return this.handleSave().then(function() {
+			return zakopUI.commitConfig();
+		});
 	},
 
 	handleSaveApply: function(ev) {
@@ -340,13 +330,13 @@ return view.extend({
 
 		return fs.write(importPath, value + '\n', 384)
 			.then(function() {
-				return fs.exec('/usr/bin/zakopd', [ 'import-uri', '-file', importPath ]);
+				return zakopUI.runJob('import');
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Import failed'));
 
-				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
+				return zakopUI.restart();
 			})
 			.then(function() {
 				window.location.reload();
@@ -356,13 +346,13 @@ return view.extend({
 	handleSubscriptionUpdate: function(section_id) {
 		return this.handleSaveCommitConfig()
 			.then(function() {
-				return fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update', section_id ]);
+				return zakopUI.runJob('subscriptions', [ section_id ]);
 			})
 			.then(function(res) {
 				if (res.code)
 					throw new Error(res.stderr || res.stdout || _('Update failed'));
 
-				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
+				return zakopUI.restart();
 			})
 			.then(function() {
 				window.location.reload();
@@ -380,17 +370,16 @@ return view.extend({
 			.then(L.bind(function() {
 				names = [];
 				uci.sections('zakop', 'subscription', function(section, sid) {
-					if (String(section.enabled == null ? '1' : section.enabled) != '0')
-						names.push(String(section['.name'] || sid));
+					names.push(String(section['.name'] || sid));
 				});
 				if (names.length == 0)
-					throw new Error(_('No enabled subscriptions configured'));
+					throw new Error(_('No subscriptions configured'));
 
 				return this.runSubscriptionUpdates(names);
 			}, this))
 			.then(function(updateFailures) {
 				failures = updateFailures;
-				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
+				return zakopUI.restart();
 			})
 			.then(function(res) {
 				if (res.code)
@@ -409,7 +398,7 @@ return view.extend({
 		names.forEach(function(name, index) {
 			chain = chain.then(function() {
 				self.setSubscriptionUpdateAllButton(true, index + 1, names.length);
-				return fs.exec('/usr/bin/zakopd', [ 'subscriptions', 'update', name ])
+				return zakopUI.runJob('subscriptions', [ name ])
 					.then(function(res) {
 						if (res.code)
 							failures.push({ name: name, error: res.stderr || res.stdout || _('Update failed') });
@@ -516,46 +505,33 @@ return view.extend({
 	},
 
 	runOutboundLatencyTests: function(targets, preserveMissing) {
-		var report = { target: '', results: [] };
 		var self = this;
-		var chain = Promise.resolve();
-
-		targets.forEach(function(target, index) {
-			chain = chain.then(function() {
-				self.setOutboundLatencyButton(true, index + 1, targets.length);
-				self.setOutboundLatencyRowButtons(true, target.tag);
-				self.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag);
-
-				return fs.exec('/usr/bin/zakopd', [ 'outbounds', 'latency', target.tag ])
-					.then(function(res) {
-						var itemReport;
-
-						if (res.code) {
-							report.results.push(self.outboundLatencyFailure(target, res.stderr || res.stdout || _('Latency test failed')));
-							return;
-						}
-						try {
-							itemReport = JSON.parse(String(res.stdout || ''));
-							if (!Array.isArray(itemReport.results) || itemReport.results.length == 0)
-								throw new Error(_('Invalid latency test response'));
-							report.target = report.target || String(itemReport.target || '');
-							itemReport.results[0].tag = target.tag;
-							itemReport.results[0].label = itemReport.results[0].label || target.label;
-							itemReport.results[0].server = itemReport.results[0].server || target.server;
-							report.results.push(itemReport.results[0]);
-						} catch (err) {
-							report.results.push(self.outboundLatencyFailure(target, _('Invalid latency test response') + ': ' + (err.message || err)));
-						}
-					}, function(err) {
-						report.results.push(self.outboundLatencyFailure(target, err.message || err));
-					})
-					.then(function() {
-						self.updateOutboundLatencyResults(report, preserveMissing);
-					});
-			});
+		var report = { target: '', results: [] };
+		var args = targets.length == 1 ? [ targets[0].tag ] : [];
+		function progress(stdout) {
+			// Ignore an incomplete final line while the worker is writing it.
+			var lines = String(stdout || '').split('\n');
+			for (var i = lines.length - 2; i >= 0; i--) {
+				if (!lines[i].trim()) continue;
+				var next = JSON.parse(lines[i]);
+				if (!Array.isArray(next.results))
+					throw new Error(_('Invalid latency test response'));
+				report = next;
+				self.setOutboundLatencyButton(true, report.results.length, targets.length);
+				self.updateOutboundLatencyResults(report, true);
+				return;
+			}
+		}
+		targets.forEach(function(target) {
+			self.setOutboundLatencyStatus(_('Testing…'), 'spinning', '', target.tag);
 		});
-
-		return chain.then(function() { return report; });
+		return zakopUI.runJob('latency', args, progress).then(function(res) {
+			if (res.code)
+				throw new Error(res.stderr || _('Latency test failed'));
+			if (report.results.length != targets.length)
+				throw new Error(_('Invalid latency test response'));
+			return report;
+		});
 	},
 
 	outboundLatencyFailure: function(target, error) {
@@ -601,11 +577,23 @@ return view.extend({
 		}
 	},
 
-	updateOutboundLatencyResults: function(report, preserveMissing) {
-		var results = Array.isArray(report && report.results) ? report.results : [];
-		var byTag = Object.create(null);
-		var best = null;
+	setOutboundLatencyInterrupted: function(err) {
 		var cells = document.querySelectorAll('[data-zakop-latency-tag]');
+		for (var i = 0; i < cells.length; i++) {
+			// Keep successful and failed proxy measurements already received.
+			if (!cells[i].classList.contains('spinning'))
+				continue;
+			cells[i].textContent = _('Test interrupted');
+			cells[i].className = 'label warning';
+			cells[i].title = err.message || String(err);
+		}
+	},
+
+	updateOutboundLatencyResults: function(report, preserveMissing, root) {
+		var results = Array.isArray(report && report.results) ? report.results : [];
+		var byTag = preserveMissing && this.outboundLatencyResults || Object.create(null);
+		var best = null;
+		var cells = (root || document).querySelectorAll('[data-zakop-latency-tag]');
 
 		for (var i = 0; i < results.length; i++) {
 			var result = results[i] || {};
@@ -614,9 +602,14 @@ return view.extend({
 			if (tag == '')
 				continue;
 			byTag[tag] = result;
-			if (result.ok && Number(result.latency_ms) > 0 && (best == null || Number(result.latency_ms) < best))
-				best = Number(result.latency_ms);
 		}
+		this.outboundLatencyResults = byTag;
+		this.outboundLatencyTargetURL = report && report.target || this.outboundLatencyTargetURL || '';
+		Object.keys(byTag).forEach(function(tag) {
+			var item = byTag[tag];
+			if (item.ok && Number(item.latency_ms) > 0 && (best == null || Number(item.latency_ms) < best))
+				best = Number(item.latency_ms);
+		});
 
 		for (var j = 0; j < cells.length; j++) {
 			var cell = cells[j];
@@ -631,13 +624,15 @@ return view.extend({
 			} else if (cellResult.ok && Number(cellResult.latency_ms) > 0) {
 				cell.textContent = String(cellResult.latency_ms) + ' ms';
 				cell.className = Number(cellResult.latency_ms) == best ? 'label success' : 'label';
-				cell.title = String(report && report.target || '');
+				cell.title = this.outboundLatencyTargetURL;
 			} else {
 				cell.textContent = _('Failed');
 				cell.className = 'label danger';
 				cell.title = cellResult.error || _('Latency test failed');
 			}
 		}
+		if (!root && this.sortOutboundCards)
+			this.sortOutboundCards();
 	},
 
 	render: function() {
@@ -653,6 +648,11 @@ return view.extend({
 		s.anonymous = false;
 		s.addremove = true;
 		s.modaltitle = _('Outbound details');
+		s.renderContents = function() {
+			var node = form.GridSection.prototype.renderContents.apply(this, arguments);
+			self.updateOutboundLatencyResults({ results: [] }, true, node);
+			return outboundCards.render(node, self);
+		};
 		s.sectiontitle = function(section_id) {
 			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
@@ -682,7 +682,7 @@ return view.extend({
 						self.latencyTesting = false;
 						self.setOutboundLatencyButton(false);
 						self.setOutboundLatencyRowButtons(false);
-						self.setOutboundLatencyStatus(_('Failed'), 'label danger', err.message || err, tag);
+						self.setOutboundLatencyStatus(_('Test interrupted'), 'label warning', err.message || err, tag);
 						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
 					});
 				}
@@ -717,7 +717,7 @@ return view.extend({
 						self.latencyTesting = false;
 						self.setOutboundLatencyButton(false);
 						self.setOutboundLatencyRowButtons(false);
-						self.setOutboundLatencyStatus(_('Not tested'), '', err.message || err);
+						self.setOutboundLatencyInterrupted(err);
 						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
 					});
 				}
@@ -1081,6 +1081,20 @@ return view.extend({
 		sub.sectiontitle = function(section_id) {
 			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
 		};
+		sub.renderRowActions = function(section_id) {
+			var actionsCell = form.GridSection.prototype.renderRowActions.apply(this, arguments);
+			var actions = actionsCell.lastElementChild;
+			actions.insertBefore(E('button', {
+				'class': 'cbi-button cbi-button-action',
+				'title': _('Update'),
+				'click': ui.createHandlerFn(self, function() {
+					return self.handleSubscriptionUpdate(section_id).catch(function(err) {
+						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+					});
+				})
+			}, _('Update')), actions.firstChild);
+			return actionsCell;
+		};
 		sub.renderSectionAdd = function() {
 			var el = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
 			addNamedSectionValidator(el, this, _('This name is reserved'));
@@ -1106,13 +1120,6 @@ return view.extend({
 			return el;
 		};
 
-		o = sub.option(form.Flag, 'enabled', _('Enabled'));
-		o.enabled = '1';
-		o.disabled = '0';
-		o.default = '1';
-		o.rmempty = false;
-		o.editable = true;
-
 		o = sub.option(form.Value, 'label', _('Name'));
 		o.cfgvalue = function(section_id) {
 			return uci.get('zakop', section_id, 'label') || uci.get('zakop', section_id, 'name') || section_id;
@@ -1127,7 +1134,6 @@ return view.extend({
 		o = sub.option(form.Value, 'url', _('URL'));
 		o.datatype = 'url';
 		o.rmempty = false;
-		o.editable = true;
 
 		o = sub.option(form.Flag, 'auto_update', _('Auto update'));
 		o.enabled = '1';
@@ -1194,11 +1200,20 @@ return view.extend({
 			return true;
 		};
 		o.modalonly = true;
-		o.onclick = L.bind(function(ev, section_id) {
-			return this.handleSubscriptionUpdate(section_id).catch(function(err) {
+		o.onclick = function(ev, section_id) {
+			// GridSection edits use a separate modal Map. Parse that Map first
+			// so a new URL is saved before the parent view starts the update.
+			return this.map.save(normalizeAll).then(function() {
+				return self.map.load();
+			}).then(function() {
+				return self.map.reset();
+			}).then(function() {
+				ui.hideModal();
+				return self.handleSubscriptionUpdate(section_id);
+			}).catch(function(err) {
 				ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
 			});
-		}, this);
+		};
 
 		return m.render();
 	}

@@ -42,7 +42,12 @@ jobs:
           sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/zakop/*.sh embedded/files/usr/share/zakop/providers/*.sh
           jq empty embedded/files/usr/share/luci/menu.d/*.json
           jq empty embedded/files/usr/share/rpcd/acl.d/*.json
-          node --check embedded/files/www/luci-static/resources/view/zakop/*.js
+          sh -n embedded/files/etc/init.d/zakop
+          for file in embedded/files/www/luci-static/resources/view/zakop/*.js embedded/files/www/luci-static/resources/zakop/*.js; do
+            node --check "$file"
+          done
+          node scripts/test-luci-runtime.js
+          python3 scripts/test-luci-jobs.py
 
       - name: Build archive
         env:

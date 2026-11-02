@@ -34,11 +34,11 @@ func TestVersionCommand(t *testing.T) {
 }
 
 func TestParseOutboundLatencyOptions(t *testing.T) {
-	opts, err := parseOutboundLatencyOptions([]string{"latency", "-config", "/tmp/zakop-test", "fast_node"})
+	opts, err := parseOutboundLatencyOptions([]string{"latency", "-progress", "-config", "/tmp/zakop-test", "fast_node"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if opts.tag != "fast_node" || opts.configPath != "/tmp/zakop-test" {
+	if !opts.progress || opts.tag != "fast_node" || opts.configPath != "/tmp/zakop-test" {
 		t.Fatalf("unexpected latency options: %+v", opts)
 	}
 	if _, err := parseOutboundLatencyOptions([]string{"test"}); err == nil {
@@ -236,6 +236,7 @@ func TestCommandSubscriptionsUpdateDirect(t *testing.T) {
 	cfgPath := filepath.Join(dir, "zakop")
 	if err := os.WriteFile(cfgPath, []byte(`
 config subscription 'sub1'
+	option enabled '0'
 	option url 'https://example.com/sub'
 	option update_via 'direct'
 `), 0644); err != nil {

@@ -297,7 +297,6 @@ type OutboundPool struct {
 type Subscription struct {
 	Name                  string
 	Label                 string
-	Enabled               bool
 	URL                   string
 	AutoUpdate            bool
 	UpdateSchedule        string
@@ -1043,9 +1042,6 @@ func (c Config) Validate() error {
 			return fmt.Errorf("duplicate subscription %q", name)
 		}
 		seenSubscriptions[name] = struct{}{}
-		if !sub.Enabled {
-			continue
-		}
 		if strings.TrimSpace(sub.URL) == "" {
 			return fmt.Errorf("subscription %q url is required", name)
 		}
@@ -1795,7 +1791,6 @@ func parseSubscription(s section) Subscription {
 	sub := Subscription{
 		Name:                  strings.TrimSpace(s.name),
 		Label:                 strings.TrimSpace(firstNonEmpty(s.options["label"], s.options["name"], s.name)),
-		Enabled:               true,
 		URL:                   strings.TrimSpace(s.options["url"]),
 		AutoUpdate:            false,
 		UpdateSchedule:        updateSchedule,
@@ -1804,9 +1799,6 @@ func parseSubscription(s section) Subscription {
 		UpdateVia:             strings.TrimSpace(firstNonEmpty(s.options["update_via"], "direct")),
 		UpdateOutbound:        strings.TrimSpace(s.options["update_outbound"]),
 		LastUpdate:            strings.TrimSpace(s.options["last_update"]),
-	}
-	if v, ok := s.options["enabled"]; ok {
-		sub.Enabled = parseBool(v, sub.Enabled)
 	}
 	if v, ok := s.options["auto_update"]; ok {
 		sub.AutoUpdate = parseBool(v, sub.AutoUpdate)

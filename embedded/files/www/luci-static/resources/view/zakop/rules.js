@@ -761,14 +761,9 @@ return view.extend({
 				if (ok === false)
 					throw new Error(_('Save failed'));
 
-				return fs.exec('/sbin/uci', [ 'commit', 'zakop' ]);
+				return zakopUI.commitConfig();
 			})
-			.then(function(res) {
-				if (res.code)
-					throw new Error(res.stderr || res.stdout || _('Commit failed'));
-
-				return fs.exec('/etc/init.d/zakop', [ 'restart' ]);
-			})
+			.then(function() { return zakopUI.restart(); })
 			.then(function() {
 				window.location.reload();
 			});

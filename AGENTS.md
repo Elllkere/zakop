@@ -253,12 +253,23 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
   `trojan`.
 - Custom outbounds use stable UCI section/tag IDs plus editable `label`.
 - Custom outbounds do not have an enable/disable switch in v1.
-- Outbounds LuCI should keep the table compact: text label/name section title,
-  type, address, port, and a read-only URLTest delay column. Do not add a second
-  editable name/input column. Protocol details belong in the edit modal.
-- Outbounds LuCI exposes a latency test. It invokes one named
-  `zakopd outbounds latency <tag>` request at a time to avoid LuCI XHR timeouts,
-  continues after an individual failure, and updates row results incrementally.
+- Outbounds LuCI uses a compact responsive card grid with search by name,
+  address, tag and protocol. Cards show the label, protocol, server:port and
+  URLTest delay, with Test/Edit/Delete actions. Display order defaults to
+  UCI section order. Users may choose natural alphabetic name order (ignoring
+  decorative flag/emoji prefixes) or successful URLTest delay ascending; without measurements
+  this leaves the current order unchanged. Failed/unmeasured nodes follow
+  measured nodes. Keep measurements and sorting across form redraws; display
+  sorting must never mutate UCI order. Reuse LuCI GridSection nodes
+  and modal lifecycle; protocol details and editable fields belong in Edit.
+  Pools and subscriptions retain their separate sections.
+- Outbounds LuCI exposes a latency test. It runs `zakopd outbounds latency -progress [tag]` as a background
+  LuCI job, polls results with short direct CGI-IO calls, and updates cards
+  incrementally. Job start/status must not use rpcd file.exec. Transient status
+  timeouts retry the same job; transport errors must not mark a proxy as failed.
+  Skip no-op UCI commits before testing to avoid config.change reloads.
+  The backend shares one temporary sing-box per batch of up to 32 nodes and
+  limits URLTest concurrency to four; individual failures do not stop the batch.
   The backend uses the native sing-box Clash API URLTest delay endpoint through
   a localhost-only temporary controller, without adding an automatic selector
   or router-self nft/TProxy routing.
@@ -301,9 +312,13 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
   add a separate Imports tab unless the user explicitly asks for it.
 - Imported outbound sections should carry `option imported '1'`; subscription
   nodes also carry `option subscription '<subscription_name>'`.
+- Subscriptions have no enabled flag. Legacy `enabled` is ignored; only
+  `auto_update` controls scheduling. URL is read-only in the table and editable
+  in the modal. Update saves the modal and configuration before downloading,
+  including for newly created subscriptions; Save & Apply is not required.
 - Subscription nodes are ordinary editable outbounds in the main Outbounds
   table. A later update of the same subscription overwrites those nodes again.
-- `config subscription '<name>'` supports `enabled`, `label`, `url`,
+- `config subscription '<name>'` supports `label`, `url`,
   `auto_update`, `update_schedule`, `update_hour`,
   `update_interval_minutes`, `update_via`, and `update_outbound`.
 - Supported import URI schemes are `vless://`, `hysteria2://`/`hy2://`,
@@ -350,6 +365,8 @@ OpenWrt/ImmortalWrt LuCI instance.
 
 ```sh
 go test ./...
+node scripts/test-luci-runtime.js
+python3 scripts/test-luci-jobs.py
 sh -n embedded/*.sh scripts/*.sh embedded/files/usr/share/zakop/*.sh embedded/files/usr/share/zakop/providers/*.sh
 sh -n embedded/files/usr/share/zakop/providers/*.sh
 jq empty embedded/files/usr/share/luci/menu.d/*.json

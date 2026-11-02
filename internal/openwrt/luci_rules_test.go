@@ -160,8 +160,8 @@ func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
 		"uci.set('zakop', section_id, 'outbound', 'direct')",
 		"uci.set('zakop', section_id, 'dns_mode', 'auto')",
 		"uci.remove('zakop', sections[i])",
-		"return fs.exec('/sbin/uci', [ 'commit', 'zakop' ])",
-		"fs.exec('/etc/init.d/zakop', [ 'restart' ])",
+		"return zakopUI.commitConfig()",
+		"zakopUI.restart()",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("rules.js missing import/export safety behavior %q:\n%s", want, s)

@@ -77,6 +77,7 @@ type downloadOptions struct {
 }
 
 type outboundLatencyOptions struct {
+	progress   bool
 	configPath string
 	tag        string
 }
@@ -207,6 +208,7 @@ func parseOutboundLatencyOptions(args []string) (outboundLatencyOptions, error) 
 	fs.SetOutput(os.Stderr)
 	opts := outboundLatencyOptions{configPath: config.DefaultPath}
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to UCI config")
+	fs.BoolVar(&opts.progress, "progress", false, "emit JSON reports as each URLTest completes")
 	if err := fs.Parse(args[1:]); err != nil {
 		return outboundLatencyOptions{}, err
 	}
@@ -585,10 +587,6 @@ func commandSubscriptionsUpdate(opts subscriptionOptions) error {
 			continue
 		}
 		matched++
-		if !sub.Enabled {
-			fmt.Printf("subscription %s is disabled; skipped\n", sub.Name)
-			continue
-		}
 		body, err := fetchSubscription(cfg, sub)
 		if err != nil {
 			return fmt.Errorf("subscription %s: %w", sub.Name, err)
@@ -801,11 +799,6 @@ type outboundLatencyItem struct {
 	outbound config.Outbound
 }
 
-type outboundLatencyMeasurement struct {
-	delayMS int64
-	err     error
-}
-
 func commandOutboundsLatency(opts outboundLatencyOptions) error {
 	cfg, err := loadConfigForManagement(opts.configPath)
 	if err != nil {
@@ -833,13 +826,24 @@ func commandOutboundsLatency(opts outboundLatencyOptions) error {
 	}
 
 	results := make([]outboundLatencyResult, 0, len(items))
+	var progressMu sync.Mutex
+	var progressResults []outboundLatencyResult
+	onResult := func(result outboundLatencyResult) {
+		if !opts.progress {
+			return
+		}
+		progressMu.Lock()
+		defer progressMu.Unlock()
+		progressResults = append(progressResults, result)
+		_ = json.NewEncoder(os.Stdout).Encode(outboundLatencyReport{Target: latencyTestURL, Results: progressResults})
+	}
 	const batchSize = 32
 	for start := 0; start < len(items); start += batchSize {
 		end := start + batchSize
 		if end > len(items) {
 			end = len(items)
 		}
-		batchResults, err := testOutboundLatencyBatch(cfg, items[start:end])
+		batchResults, err := testOutboundLatencyBatch(cfg, items[start:end], onResult)
 		if err != nil {
 			return err
 		}
@@ -862,7 +866,7 @@ func commandOutboundsLatency(opts outboundLatencyOptions) error {
 	})
 }
 
-func testOutboundLatencyBatch(cfg config.Config, items []outboundLatencyItem) ([]outboundLatencyResult, error) {
+func testOutboundLatencyBatch(cfg config.Config, items []outboundLatencyItem, onResult func(outboundLatencyResult)) ([]outboundLatencyResult, error) {
 	controllerPort, err := freeLocalPort()
 	if err != nil {
 		return nil, err
@@ -913,54 +917,32 @@ func testOutboundLatencyBatch(cfg config.Config, items []outboundLatencyItem) ([
 		}
 	}
 
-	// The first successful URLTest warms DNS and protocol state. Its value is
-	// intentionally discarded so cold setup does not inflate the report.
-	warmup := measureOutboundLatencyPass(controllerPort, items, nil)
-	measure := make([]bool, len(items))
-	for i := range warmup {
-		if warmup[i].err != nil {
-			results[i].Error = outboundLatencyError(warmup[i].err)
-			continue
-		}
-		measure[i] = true
-	}
-
-	measured := measureOutboundLatencyPass(controllerPort, items, measure)
-	for i := range measured {
-		if !measure[i] {
-			continue
-		}
-		if measured[i].err != nil {
-			results[i].Error = outboundLatencyError(measured[i].err)
-			continue
-		}
-		results[i].OK = true
-		results[i].LatencyMS = measured[i].delayMS
-		results[i].Error = ""
-	}
-	return results, nil
-}
-
-func measureOutboundLatencyPass(controllerPort int, items []outboundLatencyItem, enabled []bool) []outboundLatencyMeasurement {
-	measurements := make([]outboundLatencyMeasurement, len(items))
-	sem := make(chan struct{}, 4)
+	// Keep one temporary sing-box per batch and at most four active nodes.
+	// Warm and measure each node together so slow nodes do not hold up results.
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, 4)
 	for i, item := range items {
-		if enabled != nil && !enabled[i] {
-			continue
-		}
 		wg.Add(1)
 		go func(index int, item outboundLatencyItem) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-
-			delayMS, err := queryOutboundDelay(controllerPort, item.outbound.Tag)
-			measurements[index] = outboundLatencyMeasurement{delayMS: delayMS, err: err}
+			_, err := queryOutboundDelay(controllerPort, item.outbound.Tag)
+			if err == nil {
+				results[index].LatencyMS, err = queryOutboundDelay(controllerPort, item.outbound.Tag)
+			}
+			if err != nil {
+				results[index].Error = outboundLatencyError(err)
+			} else {
+				results[index].OK = true
+			}
+			if onResult != nil {
+				onResult(results[index])
+			}
 		}(i, item)
 	}
 	wg.Wait()
-	return measurements
+	return results, nil
 }
 
 func queryOutboundDelay(controllerPort int, outboundTag string) (int64, error) {

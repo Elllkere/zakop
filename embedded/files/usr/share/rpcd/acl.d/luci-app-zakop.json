@@ -22,6 +22,7 @@
         "/sbin/uci": [ "exec" ],
         "/usr/bin/zakopd": [ "exec" ],
         "/usr/share/zakop/upgrade.sh": [ "exec" ],
+        "/usr/share/zakop/luci-job.sh": [ "exec" ],
         "/etc/init.d/zakop": [ "exec" ]
       }
     }
