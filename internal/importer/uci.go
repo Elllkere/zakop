@@ -34,11 +34,11 @@ func ApplyNodes(nodes []Node, opts ApplyOptions) (int, error) {
 	}
 	chunks := parseChunks(string(data))
 	used := collectOutboundTags(chunks)
-	var matchedSubscriptionTags map[string][]string
+	matchedSubscriptionTags := make([]string, len(nodes))
 
 	if opts.Replace && strings.TrimSpace(opts.Source) != "" {
 		source := strings.TrimSpace(opts.Source)
-		matchedSubscriptionTags = collectSubscriptionTags(chunks, source)
+		matchedSubscriptionTags = matchSubscriptionTags(chunks, source, nodes)
 		filtered := chunks[:0]
 		for _, chunk := range chunks {
 			if chunk.Type == "outbound" && chunk.Options["subscription"] == source {
@@ -50,13 +50,20 @@ func ApplyNodes(nodes []Node, opts ApplyOptions) (int, error) {
 		used = collectOutboundTags(chunks)
 	}
 
+	// Reserve reused tags before generating any new ones, including when the
+	// refreshed subscription places a new node before an existing node.
+	for _, tag := range matchedSubscriptionTags {
+		if tag != "" {
+			used[tag] = struct{}{}
+		}
+	}
+
 	var appended []string
 	for i, node := range nodes {
 		outbound := node.Outbound
-		if tag := takeSubscriptionTag(matchedSubscriptionTags, subscriptionNodeKey(outbound)); tag != "" {
-			// A subscription refresh is allowed to change node parameters, but a
-			// rule may already refer to this node's UCI tag. Keep the tag when the
-			// protocol endpoint and credentials identify the same node.
+		if tag := matchedSubscriptionTags[i]; tag != "" {
+			// Keep rule and pool references when a refreshed node matches by
+			// endpoint or by an unambiguous label and credentials.
 			outbound.Tag = tag
 		} else if strings.TrimSpace(outbound.Tag) == "" {
 			outbound.Tag = uniqueTag(tagBase(node, opts, i), used)
@@ -173,51 +180,98 @@ func collectOutboundTags(chunks []chunk) map[string]struct{} {
 	return used
 }
 
-// collectSubscriptionTags returns existing tags grouped by the stable
-// subscription-node identity. A slice is used because a subscription can
-// legitimately contain duplicate nodes.
-func collectSubscriptionTags(chunks []chunk, source string) map[string][]string {
-	tags := make(map[string][]string)
+// matchSubscriptionTags reserves endpoint matches for the entire batch before
+// considering address changes. Label fallback is scoped to one subscription
+// and requires exactly one old and one new unmatched node with the same label,
+// protocol, port and credentials. Ambiguous nodes are never guessed.
+func matchSubscriptionTags(chunks []chunk, source string, nodes []Node) []string {
+	type candidate struct {
+		tag      string
+		labelKey string
+	}
+	var candidates []candidate
+	byEndpoint := make(map[string][]int)
 	for _, chunk := range chunks {
 		if chunk.Type != "outbound" || chunk.Options["subscription"] != source {
 			continue
 		}
-		key := subscriptionNodeKey(config.Outbound{
+		outbound := config.Outbound{
+			Label:    chunk.Options["label"],
 			Type:     chunk.Options["type"],
 			Server:   firstNonEmpty(chunk.Options["server"], chunk.Options["address"]),
 			Port:     optionPort(chunk.Options["port"]),
 			UUID:     chunk.Options["uuid"],
 			Password: chunk.Options["password"],
 			Method:   firstNonEmpty(chunk.Options["method"], chunk.Options["shadowsocks_encrypt_method"]),
-		})
+		}
+		key := subscriptionNodeKey(outbound)
 		tag := strings.TrimSpace(firstNonEmpty(chunk.Options["tag"], chunk.Name))
 		if key != "" && tag != "" {
-			tags[key] = append(tags[key], tag)
+			byEndpoint[key] = append(byEndpoint[key], len(candidates))
+			candidates = append(candidates, candidate{tag: tag, labelKey: subscriptionNodeLabelKey(outbound)})
 		}
 	}
-	return tags
-}
+	matched := make([]string, len(nodes))
+	for i, node := range nodes {
+		key := subscriptionNodeKey(node.Outbound)
+		indices := byEndpoint[key]
+		if len(indices) == 0 {
+			continue
+		}
+		index := indices[0]
+		matched[i] = candidates[index].tag
+		candidates[index].tag = ""
+		byEndpoint[key] = indices[1:]
+	}
 
-func takeSubscriptionTag(tags map[string][]string, key string) string {
-	if len(tags) == 0 || key == "" {
-		return ""
+	byLabel := make(map[string][]string)
+	for _, candidate := range candidates {
+		if candidate.tag != "" && candidate.labelKey != "" {
+			byLabel[candidate.labelKey] = append(byLabel[candidate.labelKey], candidate.tag)
+		}
 	}
-	matched := tags[key]
-	if len(matched) == 0 {
-		return ""
+	newLabelCounts := make(map[string]int)
+	for i, node := range nodes {
+		if matched[i] == "" {
+			newLabelCounts[subscriptionNodeLabelKey(node.Outbound)]++
+		}
 	}
-	tag := matched[0]
-	tags[key] = matched[1:]
-	return tag
+	for i, node := range nodes {
+		if matched[i] != "" {
+			continue
+		}
+		key := subscriptionNodeLabelKey(node.Outbound)
+		if key != "" && len(byLabel[key]) == 1 && newLabelCounts[key] == 1 {
+			matched[i] = byLabel[key][0]
+		}
+	}
+	return matched
 }
 
 // subscriptionNodeKey intentionally excludes mutable transport and display
 // fields. Providers commonly change those during a refresh, while the
 // protocol endpoint plus its credential identifies the same logical node.
 func subscriptionNodeKey(outbound config.Outbound) string {
-	typ := strings.ToLower(strings.TrimSpace(outbound.Type))
 	server := strings.ToLower(strings.TrimSpace(outbound.Server))
-	if typ == "" || server == "" || outbound.Port <= 0 {
+	key := subscriptionNodeCredentialKey(outbound)
+	if server == "" || key == "" {
+		return ""
+	}
+	return key + "\x00" + server
+}
+
+func subscriptionNodeLabelKey(outbound config.Outbound) string {
+	label := strings.TrimSpace(outbound.Label)
+	key := subscriptionNodeCredentialKey(outbound)
+	if label == "" || key == "" {
+		return ""
+	}
+	return key + "\x00" + label
+}
+
+func subscriptionNodeCredentialKey(outbound config.Outbound) string {
+	typ := strings.ToLower(strings.TrimSpace(outbound.Type))
+	if typ == "" || outbound.Port <= 0 {
 		return ""
 	}
 	credential := ""
@@ -234,7 +288,7 @@ func subscriptionNodeKey(outbound config.Outbound) string {
 	if credential == "" {
 		return ""
 	}
-	return typ + "\x00" + server + "\x00" + strconv.Itoa(outbound.Port) + "\x00" + credential
+	return typ + "\x00" + strconv.Itoa(outbound.Port) + "\x00" + credential
 }
 
 func optionPort(value string) int {
