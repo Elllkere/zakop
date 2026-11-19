@@ -220,8 +220,8 @@ function validateProviderReferences() {
 	var providers = activeProviderNames();
 	var error = null;
 
-	uci.sections('zakop', 'rule', function(section, sid) {
-		if (error != null || uci.get('zakop', sid, 'enabled') == '0')
+	function check(section, sid) {
+		if (error != null || section.override)
 			return;
 
 		var ruleName = String(uci.get('zakop', sid, 'name') || sid).trim();
@@ -233,7 +233,9 @@ function validateProviderReferences() {
 				return;
 			}
 		}
-	});
+	}
+	uci.sections('zakop', 'rule', check);
+	uci.sections('zakop', 'client_rule', check);
 
 	if (error != null)
 		throw new Error(error);
@@ -390,7 +392,7 @@ return view.extend({
 				return ui.changes.init();
 			})
 			.catch(function(err) {
-				ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+				zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 				if (err != null && typeof err == 'object')
 					err.notified = true;
 				return Promise.reject(err);
@@ -489,7 +491,7 @@ return view.extend({
 	},
 
 	showProviderUpdateFailures: function(failures) {
-		ui.addNotification(null, E('div', {}, [
+		zakopUI.notify(E('div', {}, [
 			E('p', {}, _('Some providers failed to update. Successful updates were kept.')),
 			E('ul', {}, failures.map(function(item) {
 				return E('li', {}, [ E('strong', {}, item.name + ': '), String(item.error || _('Update failed')) ]);
@@ -514,7 +516,7 @@ return view.extend({
 				}
 
 				if (added == 0) {
-					ui.addNotification(null, E('p', {}, [ _('Provider presets already exist') ]), 'info');
+					zakopUI.notify(E('p', {}, [ _('Provider presets already exist') ]), 'info');
 					return Promise.resolve();
 				}
 
@@ -558,7 +560,7 @@ return view.extend({
 				'click': function(ev) {
 					ev.preventDefault();
 					return self.handleImportProviderPresets().catch(function(err) {
-						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+						zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 					});
 				}
 			}, _('Import provider presets')));
@@ -578,7 +580,7 @@ return view.extend({
 					}, function(err) {
 						self.providerUpdateAllRunning = false;
 						self.setProviderUpdateAllButton(false);
-						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+						zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 					});
 				}
 			}, self.providerUpdateAllRunning ? _('Updating all…') : _('Update all')));
@@ -727,7 +729,7 @@ return view.extend({
 		o.onclick = L.bind(function(ev, section_id) {
 			return this.handleProviderUpdate(section_id).catch(function(err) {
 				if (!(err != null && typeof err == 'object' && err.notified))
-					ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+					zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 			});
 		}, this);
 

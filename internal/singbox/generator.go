@@ -41,6 +41,9 @@ type Route struct {
 
 func Generate(cfg config.Config) ([]byte, error) {
 	proxyTargets := proxyroute.Targets(cfg)
+	rules := cfg.EffectiveRules()
+	clientSources := config.ClientRuleSources(rules)
+	clientFakeIP, hasClientFakeIP := proxyroute.ClientFakeIPTarget(cfg, clientSources, proxyTargets)
 	fakeDNSHost, fakeDNSPort, err := splitHostPort(cfg.Main.SingBoxDNSFakeIPAddr())
 	if err != nil {
 		return nil, err
@@ -73,12 +76,44 @@ func Generate(cfg config.Config) ([]byte, error) {
 		})
 	}
 
-	routeRules := []any{
+	var routeRules []any
+	if hasClientFakeIP {
+		// sing-box restores the FakeIP domain before matching route rules.
+		// Keep that DNS decision ahead of any domain learned from sniffing.
+		routeRules = append(routeRules, domainOutboundRouteRules(rules, []string{clientFakeIP.Inbound}, proxyTargets, true)...)
+		routeRules = append(routeRules, map[string]any{
+			"inbound": []string{clientFakeIP.Inbound},
+			"action":  "reject",
+		})
+	}
+	if len(clientSources) > 0 {
+		// These packets already matched an outbound in nftables. Sniffed
+		// domains must not override a client-specific IP/CIDR decision.
+		sourceCIDRs := make([]string, 0, len(clientSources))
+		for _, source := range clientSources {
+			sourceCIDRs = append(sourceCIDRs, source+"/32")
+		}
+		for _, target := range proxyTargets {
+			routeRules = append(routeRules, map[string]any{
+				"inbound":        []string{target.Inbound},
+				"source_ip_cidr": sourceCIDRs,
+				"action":         "route",
+				"outbound":       target.Tag,
+			})
+		}
+	}
+	routeRules = append(routeRules,
 		map[string]any{"action": "sniff"},
 		map[string]any{"protocol": "dns", "action": "hijack-dns"},
-	}
+	)
 	routeRules = append(routeRules, clientOutboundRouteRules(cfg, proxyTargets)...)
-	routeRules = append(routeRules, domainOutboundRouteRules(cfg, proxyTargets)...)
+	if len(proxyTargets) > 0 {
+		tproxyInbounds := make([]string, 0, len(proxyTargets))
+		for _, target := range proxyTargets {
+			tproxyInbounds = append(tproxyInbounds, target.Inbound)
+		}
+		routeRules = append(routeRules, domainOutboundRouteRules(rules, tproxyInbounds, proxyTargets, false)...)
+	}
 	for _, target := range proxyTargets {
 		routeRules = append(routeRules, map[string]any{
 			"inbound":  []string{target.Inbound},
@@ -111,6 +146,9 @@ func Generate(cfg config.Config) ([]byte, error) {
 			"listen_port": realProxyDNSPort,
 			"udp_timeout": "10s",
 		},
+	}
+	if hasClientFakeIP {
+		proxyTargets = append(proxyTargets, clientFakeIP)
 	}
 	for _, target := range proxyTargets {
 		inbounds = append(inbounds, map[string]any{
@@ -417,49 +455,49 @@ func clientOutboundRouteRules(cfg config.Config, targets []proxyroute.Target) []
 	return out
 }
 
-func domainOutboundRouteRules(cfg config.Config, targets []proxyroute.Target) []any {
-	if len(targets) == 0 {
-		return nil
-	}
-	inbounds := make([]string, 0, len(targets))
-	for _, target := range targets {
-		inbounds = append(inbounds, target.Inbound)
-	}
-
+func domainOutboundRouteRules(rules []config.Rule, inbounds []string, targets []proxyroute.Target, clientFakeIP bool) []any {
 	var out []any
-	for _, rule := range cfg.EffectiveRules() {
-		if !rule.Enabled || rule.Action != "proxy" {
+	for _, rule := range rules {
+		if !rule.Enabled || (!clientFakeIP && (rule.ClientIP != "" || rule.Action != "proxy")) {
 			continue
 		}
 		includes := domainRegexps(rule.DomainEquals, rule.DomainContains, rule.DomainStartsWith, rule.DomainEndsWith)
 		if len(includes) == 0 {
 			continue
 		}
-		if _, ok := proxyroute.Find(targets, rule.Outbound); !ok {
-			continue
+		if rule.Action == "proxy" {
+			if _, ok := proxyroute.Find(targets, rule.Outbound); !ok {
+				continue
+			}
 		}
 
 		includeRule := map[string]any{
 			"inbound":      inbounds,
 			"domain_regex": includes,
 		}
-		excludes := domainRegexps(rule.ExcludeDomainEquals, rule.ExcludeDomainContains, rule.ExcludeDomainStartsWith, rule.ExcludeDomainEndsWith)
-		if len(excludes) == 0 {
-			includeRule["action"] = "route"
-			includeRule["outbound"] = rule.Outbound
-			out = append(out, includeRule)
-			continue
+		if rule.ClientIP != "" {
+			includeRule["source_ip_cidr"] = []string{rule.ClientIP + "/32"}
 		}
-		out = append(out, map[string]any{
-			"type": "logical",
-			"mode": "and",
-			"rules": []any{
-				includeRule,
-				map[string]any{"domain_regex": excludes, "invert": true},
-			},
-			"action":   "route",
-			"outbound": rule.Outbound,
-		})
+		result := includeRule
+		excludes := domainRegexps(rule.ExcludeDomainEquals, rule.ExcludeDomainContains, rule.ExcludeDomainStartsWith, rule.ExcludeDomainEndsWith)
+		if len(excludes) > 0 {
+			result = map[string]any{
+				"type": "logical",
+				"mode": "and",
+				"rules": []any{
+					includeRule,
+					map[string]any{"domain_regex": excludes, "invert": true},
+				},
+			}
+		}
+		if clientFakeIP && (rule.Action != "proxy" || rule.DNSMode == "real_ip") {
+			// Stale client DNS caches can still contain a previous FakeIP.
+			result["action"] = "reject"
+		} else {
+			result["action"] = "route"
+			result["outbound"] = rule.Outbound
+		}
+		out = append(out, result)
 	}
 	return out
 }

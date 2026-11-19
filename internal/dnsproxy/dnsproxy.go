@@ -310,7 +310,7 @@ func (p Proxy) domainDecision(name string, clientIP string) ruleengine.Decision 
 	if p.RoutingMode == "global" {
 		return ruleengine.Decision{Action: "direct", DNSMode: "real_ip"}
 	}
-	return ruleengine.DomainDecision(p.Rules, name)
+	return ruleengine.ClientDomainDecision(p.Rules, name, clientIP)
 }
 
 func (p Proxy) isLANClient(clientIP string) bool {

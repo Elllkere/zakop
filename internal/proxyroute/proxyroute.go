@@ -41,3 +41,16 @@ func Find(targets []Target, tag string) (Target, bool) {
 	}
 	return Target{}, false
 }
+
+// ClientFakeIPTarget keeps domain reverse mapping separate from TProxy
+// listeners that already have an outbound selected by the packet rules.
+func ClientFakeIPTarget(cfg config.Config, sources []string, targets []Target) (Target, bool) {
+	if !cfg.Main.FakeIPEnabled || len(sources) == 0 || len(targets) == 0 {
+		return Target{}, false
+	}
+	return Target{
+		Chain:   "to_client_fakeip",
+		Inbound: "client-fakeip-in",
+		Port:    cfg.Main.TProxyPort + len(targets),
+	}, true
+}

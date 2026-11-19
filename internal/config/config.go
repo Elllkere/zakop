@@ -38,6 +38,7 @@ type Config struct {
 	Main          Main
 	Clients       []Client
 	Rules         []Rule
+	ClientRules   []Rule
 	Providers     []Provider
 	Outbounds     []Outbound
 	OutboundPools []OutboundPool
@@ -95,6 +96,9 @@ type Client struct {
 }
 
 type Rule struct {
+	ID                      string
+	ClientIP                string
+	Override                string
 	Name                    string
 	Enabled                 bool
 	Priority                int
@@ -443,11 +447,67 @@ func (c Config) OutboundCandidateTags(tag string) []string {
 	return nil
 }
 
+// EffectiveRules orders client-specific matches before shared rules. An
+// override always uses the current matchers of its referenced shared rule.
 func (c Config) EffectiveRules() []Rule {
-	if c.Main.RoutingMode != "simple" {
-		return c.Rules
+	shared := c.Rules
+	switch c.Main.RoutingMode {
+	case "global":
+		return shared
+	case "simple":
+		shared = []Rule{c.Main.EffectiveSimpleRule()}
 	}
-	return []Rule{c.Main.EffectiveSimpleRule()}
+	if len(c.ClientRules) == 0 {
+		return shared
+	}
+	clients := make(map[string]bool, len(c.Clients))
+	for _, client := range c.Clients {
+		clients[client.IP] = client.Policy == "default" || client.Policy == ""
+	}
+	var rules []Rule
+	for _, r := range c.resolveClientRules(shared) {
+		if r.Enabled && clients[r.ClientIP] {
+			rules = append(rules, r)
+		}
+	}
+	return append(rules, shared...)
+}
+
+func (c Config) resolveClientRules(shared []Rule) []Rule {
+	byID := make(map[string]Rule, len(shared))
+	for _, r := range shared {
+		if r.ID != "" {
+			byID[r.ID] = r
+		}
+	}
+	rules := make([]Rule, 0, len(c.ClientRules))
+	for _, r := range c.ClientRules {
+		if r.Override == "" {
+			rules = append(rules, r)
+			continue
+		}
+		base, ok := byID[r.Override]
+		if !ok {
+			continue
+		}
+		base.ClientIP, base.Override = r.ClientIP, r.Override
+		base.Action, base.Outbound, base.DNSMode = r.Action, r.Outbound, r.DNSMode
+		base.Enabled = r.Enabled && base.Enabled
+		rules = append(rules, base)
+	}
+	return rules
+}
+
+func ClientRuleSources(rules []Rule) []string {
+	seen := make(map[string]bool)
+	var sources []string
+	for _, r := range rules {
+		if r.ClientIP != "" && !seen[r.ClientIP] {
+			sources = append(sources, r.ClientIP)
+			seen[r.ClientIP] = true
+		}
+	}
+	return sources
 }
 
 func (m Main) EffectiveSimpleRule() Rule {
@@ -623,13 +683,19 @@ func Parse(data string) (Config, error) {
 			}
 			cfg.Clients = append(cfg.Clients, Client{
 				Name:     firstNonEmpty(s.options["name"], s.name),
-				IP:       s.options["ip"],
+				IP:       strings.TrimSpace(s.options["ip"]),
 				Policy:   policy,
 				Outbound: normalizeClientOutbound(s.options["outbound"]),
 			})
 		case "rule":
 			rule, warnings := parseRule(s, len(cfg.Rules))
 			cfg.Rules = append(cfg.Rules, rule)
+			cfg.Warnings = append(cfg.Warnings, warnings...)
+		case "client_rule":
+			rule, warnings := parseRule(s, len(cfg.ClientRules))
+			rule.ClientIP = strings.TrimSpace(s.options["client_ip"])
+			rule.Override = strings.TrimSpace(s.options["override"])
+			cfg.ClientRules = append(cfg.ClientRules, rule)
 			cfg.Warnings = append(cfg.Warnings, warnings...)
 		case "provider":
 			cfg.Providers = append(cfg.Providers, parseProvider(s))
@@ -651,6 +717,9 @@ func Parse(data string) (Config, error) {
 	sort.SliceStable(cfg.Rules, func(i, j int) bool {
 		return cfg.Rules[i].Priority < cfg.Rules[j].Priority
 	})
+	sort.SliceStable(cfg.ClientRules, func(i, j int) bool {
+		return cfg.ClientRules[i].Priority < cfg.ClientRules[j].Priority
+	})
 	cfg.Main.LANSubnets = normalizeIPv4CIDRStrings(cfg.Main.LANSubnets)
 
 	if err := cfg.Validate(); err != nil {
@@ -671,9 +740,11 @@ func assignFirstCustomOutbound(cfg *Config) {
 		return
 	}
 
-	for i := range cfg.Rules {
-		if cfg.Rules[i].Action == "proxy" && (strings.TrimSpace(cfg.Rules[i].Outbound) == "" || reservedCustomOutboundTag(cfg.Rules[i].Outbound)) {
-			cfg.Rules[i].Outbound = first
+	for _, rules := range [][]Rule{cfg.Rules, cfg.ClientRules} {
+		for i := range rules {
+			if rules[i].Action == "proxy" && (strings.TrimSpace(rules[i].Outbound) == "" || reservedCustomOutboundTag(rules[i].Outbound)) {
+				rules[i].Outbound = first
+			}
 		}
 	}
 	if cfg.Main.RoutingMode == "simple" && cfg.Main.SimpleRule.Action == "proxy" && (strings.TrimSpace(cfg.Main.SimpleRule.Outbound) == "" || reservedCustomOutboundTag(cfg.Main.SimpleRule.Outbound)) {
@@ -906,6 +977,9 @@ func (c Config) Validate() error {
 		seenOutboundTags[tag] = struct{}{}
 	}
 	proxyTargetCount := len(c.ProxyTargetTags())
+	if proxyTargetCount > 0 && c.Main.FakeIPEnabled && len(ClientRuleSources(c.EffectiveRules())) > 0 {
+		proxyTargetCount++
+	}
 	if proxyTargetCount > 0 && c.Main.TProxyPort+proxyTargetCount-1 > 65535 {
 		return fmt.Errorf("tproxy_port %d leaves insufficient ports for %d outbound targets", c.Main.TProxyPort, proxyTargetCount)
 	}
@@ -1079,7 +1153,25 @@ func (c Config) Validate() error {
 			}
 		}
 	}
-	rules := c.Rules
+	ruleIDs := make(map[string]bool, len(c.Rules))
+	for _, r := range c.Rules {
+		if r.ID != "" && ruleIDs[r.ID] {
+			return fmt.Errorf("duplicate rule ID %q", r.ID)
+		}
+		ruleIDs[r.ID] = true
+	}
+	for _, r := range c.ClientRules {
+		if ip := net.ParseIP(r.ClientIP); ip == nil || ip.To4() == nil || strings.Contains(r.ClientIP, ":") {
+			return fmt.Errorf("client rule %q requires an IPv4 client_ip", r.Name)
+		}
+		// Check the action/outbound even if the shared rule no longer exists.
+		if r.Action == "proxy" {
+			if _, ok := seenOutboundTags[r.Outbound]; !ok || reservedCustomOutboundTag(r.Outbound) {
+				return fmt.Errorf("client rule %q requires a valid custom outbound", r.Name)
+			}
+		}
+	}
+	rules := append(append([]Rule(nil), c.Rules...), c.resolveClientRules(c.Rules)...)
 	if c.Main.RoutingMode == "simple" {
 		rules = append(append([]Rule(nil), rules...), c.Main.EffectiveSimpleRule())
 	}
@@ -1446,6 +1538,7 @@ func parseRule(s section, order int) (Rule, []string) {
 		outbound = BuiltinDirectOutbound
 	}
 	r := Rule{
+		ID:       strings.TrimSpace(firstNonEmpty(s.options["rule_id"], s.name)),
 		Name:     firstNonEmpty(s.options["name"], s.name, fmt.Sprintf("rule_%d", order+1)),
 		Enabled:  true,
 		Priority: 1000 + order,
@@ -1582,9 +1675,13 @@ func LoadRuleDomainFiles(cfg *Config) error {
 	if cfg == nil {
 		return nil
 	}
-	for i := range cfg.Rules {
-		if err := loadRuleDomainFiles(cfg, &cfg.Rules[i]); err != nil {
-			return err
+	for _, rules := range [][]Rule{cfg.Rules, cfg.ClientRules} {
+		for i := range rules {
+			if rules[i].Override == "" {
+				if err := loadRuleDomainFiles(cfg, &rules[i]); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if cfg.Main.RoutingMode == "simple" {

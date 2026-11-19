@@ -428,3 +428,42 @@ func TestStripClientSubnetOptionPreservesOtherEDNSOptions(t *testing.T) {
 		t.Fatalf("non-ECS EDNS option was not preserved: %x", stripped)
 	}
 }
+
+func TestClientDomainRulesPrecedeSharedDNSPolicy(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Main.LANSubnets = []string{"192.168.8.0/24"}
+	cfg.Clients = []config.Client{
+		{IP: "192.168.8.20", Policy: "default"},
+		{IP: "192.168.8.21", Policy: "default"},
+		{IP: "192.168.8.22", Policy: "direct"},
+		{IP: "192.168.8.23", Policy: "proxy"},
+	}
+	shared := fakeRule("youtube.com")
+	shared.ID, shared.Outbound = "youtube", "poland"
+	cfg.Rules = []config.Rule{shared}
+	cfg.ClientRules = []config.Rule{
+		{Enabled: true, ClientIP: "192.168.8.20", Override: shared.ID, Action: "direct", DNSMode: "auto"},
+		{Enabled: true, ClientIP: "192.168.8.21", Action: "block", DNSMode: "auto", DomainEquals: []string{"youtube.com"}},
+		{Enabled: true, ClientIP: "192.168.8.22", Action: "block", DNSMode: "auto", DomainEquals: []string{"youtube.com"}},
+		{Enabled: true, ClientIP: "192.168.8.23", Action: "block", DNSMode: "auto", DomainEquals: []string{"youtube.com"}},
+		{Enabled: true, ClientIP: "192.168.8.24", Action: "block", DNSMode: "auto", DomainEquals: []string{"youtube.com"}},
+	}
+	proxy := New(cfg)
+	for ip, want := range map[string]string{
+		"192.168.8.20": "direct", "192.168.8.21": "block", "192.168.8.22": "direct",
+		"192.168.8.23": "proxy", "192.168.8.24": "proxy", "192.168.8.25": "proxy",
+		"127.0.0.1": "direct", "203.0.113.20": "direct",
+	} {
+		if decision := proxy.domainDecision("youtube.com", ip); decision.Action != want {
+			t.Errorf("client %s got %+v, want %s", ip, decision, want)
+		}
+	}
+	if response, ok := proxy.localResponse(testQuery(qTypeAAAA), "192.168.8.21"); !ok || response[3]&0x0f != 3 {
+		t.Fatal("blocked client should get NXDOMAIN for AAAA as well as A")
+	}
+
+	cfg.Main.RoutingMode = "global"
+	if decision := New(cfg).domainDecision("youtube.com", "192.168.8.21"); decision.Action != "direct" {
+		t.Fatalf("global DNS policy changed: %+v", decision)
+	}
+}

@@ -54,6 +54,9 @@ func Summary(cfg config.Config) string {
 
 func tproxyListenerStatus(cfg config.Config, probe func(string) string) string {
 	targets := proxyroute.Targets(cfg)
+	if target, ok := proxyroute.ClientFakeIPTarget(cfg, config.ClientRuleSources(cfg.EffectiveRules()), targets); ok {
+		targets = append(targets, target)
+	}
 	if len(targets) == 0 {
 		return "not_required"
 	}

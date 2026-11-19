@@ -303,7 +303,7 @@ return view.extend({
 					textarea.disabled = null;
 					importButton.textContent = _('Import');
 					status.style.display = 'none';
-					ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+					zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 				});
 			}, this)
 		}, _('Import'));
@@ -343,51 +343,94 @@ return view.extend({
 			});
 	},
 
-	handleSubscriptionUpdate: function(section_id) {
-		return this.handleSaveCommitConfig()
-			.then(function() {
-				return zakopUI.runJob('subscriptions', [ section_id ]);
-			})
-			.then(function(res) {
-				if (res.code)
-					throw new Error(res.stderr || res.stdout || _('Update failed'));
+	handleSubscriptionUpdate: function(section_id, modalMap) {
+		if (this.subscriptionUpdating || this.subscriptionUpdateAllRunning)
+			return Promise.resolve();
+		this.subscriptionUpdating = section_id;
+		this.setSubscriptionUpdateButtons();
 
-				return zakopUI.restart();
-			})
-			.then(function() {
-				window.location.reload();
-			});
+		var self = this;
+		var label = uci.get('zakop', section_id, 'label') || section_id;
+		var prepared = modalMap ? modalMap.save(normalizeAll, true).then(function() {
+			return self.map.load();
+		}).then(function() {
+			return self.map.reset();
+		}).then(function() {
+			ui.hideModal();
+		}) : Promise.resolve();
+
+		return prepared.then(function() {
+			return self.handleSaveCommitConfig();
+		}).then(function() {
+			return zakopUI.runJob('subscriptions', [ section_id ]);
+		}).then(function(res) {
+			if (res.code)
+				throw new Error(res.stderr || res.stdout || _('Update failed'));
+			return self.refreshSubscriptions();
+		}).then(function() {
+			zakopUI.notify(_('Subscription "%s" updated.').format(label), 'success');
+		}).catch(function(err) {
+			zakopUI.notify(String(err.message || err), 'danger');
+		}).finally(function() {
+			self.subscriptionUpdating = null;
+			self.setSubscriptionUpdateButtons();
+		});
 	},
 
 	handleSubscriptionUpdateAll: function() {
-		var failures;
-		var names;
-
+		if (this.subscriptionUpdating || this.subscriptionUpdateAllRunning)
+			return Promise.resolve();
+		var self = this;
 		this.subscriptionUpdateAllRunning = true;
+		this.setSubscriptionUpdateButtons();
 		this.setSubscriptionUpdateAllButton(true);
 
 		return this.handleSaveCommitConfig()
-			.then(L.bind(function() {
-				names = [];
-				uci.sections('zakop', 'subscription', function(section, sid) {
-					names.push(String(section['.name'] || sid));
-				});
+			.then(function() {
+				var names = uci.sections('zakop', 'subscription').map(function(section) { return section['.name']; });
 				if (names.length == 0)
 					throw new Error(_('No subscriptions configured'));
-
-				return this.runSubscriptionUpdates(names);
-			}, this))
-			.then(function(updateFailures) {
-				failures = updateFailures;
-				return zakopUI.restart();
+				return self.runSubscriptionUpdates(names);
 			})
-			.then(function(res) {
-				if (res.code)
-					throw new Error(res.stderr || res.stdout || _('Restart failed'));
-				if (failures.length == 0)
-					window.location.reload();
-				return failures;
+			.then(function(failures) {
+				if (failures.length)
+					self.showSubscriptionUpdateFailures(failures);
+				return self.refreshSubscriptions().then(function() {
+					if (!failures.length)
+						zakopUI.notify(_('Subscriptions updated.'), 'success');
+				});
+			})
+			.catch(function(err) {
+				zakopUI.notify(String(err.message || err), 'danger');
+			})
+			.finally(function() {
+				self.subscriptionUpdateAllRunning = false;
+				self.setSubscriptionUpdateButtons();
+				self.setSubscriptionUpdateAllButton(false);
 			});
+	},
+
+	refreshSubscriptions: function() {
+		var self = this;
+		return zakopUI.restart().finally(function() {
+			uci.unload('zakop');
+			return self.map.load().then(function() { return self.map.reset(); });
+		});
+	},
+
+	setSubscriptionUpdateButtons: function() {
+		var updating = this.subscriptionUpdating;
+		var busy = !!updating || this.subscriptionUpdateAllRunning;
+		var buttons = document.querySelectorAll('button[data-zakop-subscription-update]');
+		for (var i = 0; i < buttons.length; i++) {
+			var active = buttons[i].getAttribute('data-zakop-subscription-update') == updating;
+			buttons[i].disabled = !!busy;
+			buttons[i].classList.toggle('spinning', active);
+			buttons[i].textContent = active ? _('Updating…') : _('Update');
+		}
+		var all = document.querySelector('[data-zakop-subscriptions-update-all]');
+		if (all)
+			all.disabled = !!busy;
 	},
 
 	runSubscriptionUpdates: function(names) {
@@ -416,18 +459,17 @@ return view.extend({
 		var text = running && total ? _('Updating %d/%d…').format(current, total) : (running ? _('Updating all…') : _('Update all'));
 
 		for (var i = 0; i < buttons.length; i++) {
-			buttons[i].disabled = running ? true : null;
+			buttons[i].disabled = running || !!this.subscriptionUpdating;
 			buttons[i].textContent = text;
 		}
 	},
 
 	showSubscriptionUpdateFailures: function(failures) {
-		ui.addNotification(null, E('div', {}, [
+		zakopUI.notify(E('div', {}, [
 			E('p', {}, _('Some subscriptions failed to update. Successful updates were kept.')),
 			E('ul', {}, failures.map(function(item) {
 				return E('li', {}, [ E('strong', {}, item.name + ': '), String(item.error || _('Update failed')) ]);
-			})),
-			E('p', {}, _('Reload the page to show successful updates.'))
+			}))
 		]), 'warning');
 	},
 
@@ -461,7 +503,7 @@ return view.extend({
 			}, this))
 			.then(L.bind(function(report) {
 				this.updateOutboundLatencyResults(report);
-				ui.addNotification(null, E('p', {}, _('Latency test completed.')), 'info');
+				zakopUI.notify(E('p', {}, _('Latency test completed.')), 'info');
 			}, this));
 	},
 
@@ -486,7 +528,7 @@ return view.extend({
 			}, this))
 			.then(L.bind(function(report) {
 				this.updateOutboundLatencyResults(report, true);
-				ui.addNotification(null, E('p', {}, _('Latency test completed.')), 'info');
+				zakopUI.notify(E('p', {}, _('Latency test completed.')), 'info');
 			}, this));
 	},
 
@@ -683,7 +725,7 @@ return view.extend({
 						self.setOutboundLatencyButton(false);
 						self.setOutboundLatencyRowButtons(false);
 						self.setOutboundLatencyStatus(_('Test interrupted'), 'label warning', err.message || err, tag);
-						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+						zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 					});
 				}
 			}, self.latencyTesting ? _('Testing…') : _('Test'));
@@ -718,7 +760,7 @@ return view.extend({
 						self.setOutboundLatencyButton(false);
 						self.setOutboundLatencyRowButtons(false);
 						self.setOutboundLatencyInterrupted(err);
-						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
+						zakopUI.notify(E('p', {}, [ err.message || err ]), 'danger');
 					});
 				}
 			}, self.latencyTesting ? _('Testing…') : _('Test latency'));
@@ -1084,15 +1126,16 @@ return view.extend({
 		sub.renderRowActions = function(section_id) {
 			var actionsCell = form.GridSection.prototype.renderRowActions.apply(this, arguments);
 			var actions = actionsCell.lastElementChild;
+			var updating = self.subscriptionUpdating == section_id;
 			actions.insertBefore(E('button', {
-				'class': 'cbi-button cbi-button-action',
-				'title': _('Update'),
-				'click': ui.createHandlerFn(self, function() {
-					return self.handleSubscriptionUpdate(section_id).catch(function(err) {
-						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
-					});
-				})
-			}, _('Update')), actions.firstChild);
+				'class': 'cbi-button cbi-button-action' + (updating ? ' spinning' : ''),
+				'data-zakop-subscription-update': section_id,
+				'disabled': self.subscriptionUpdating || self.subscriptionUpdateAllRunning ? true : null,
+				'click': function(ev) {
+					ev.preventDefault();
+					return self.handleSubscriptionUpdate(section_id);
+				}
+			}, updating ? _('Updating…') : _('Update')), actions.firstChild);
 			return actionsCell;
 		};
 		sub.renderSectionAdd = function() {
@@ -1102,19 +1145,10 @@ return view.extend({
 				'class': 'cbi-button cbi-button-action',
 				'style': 'margin-left:.5em',
 				'data-zakop-subscriptions-update-all': '1',
-				'disabled': self.subscriptionUpdateAllRunning ? true : null,
+				'disabled': self.subscriptionUpdating || self.subscriptionUpdateAllRunning ? true : null,
 				'click': function(ev) {
 					ev.preventDefault();
-					return self.handleSubscriptionUpdateAll().then(function(failures) {
-						self.subscriptionUpdateAllRunning = false;
-						self.setSubscriptionUpdateAllButton(false);
-						if (failures.length)
-							self.showSubscriptionUpdateFailures(failures);
-					}, function(err) {
-						self.subscriptionUpdateAllRunning = false;
-						self.setSubscriptionUpdateAllButton(false);
-						ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
-					});
+					return self.handleSubscriptionUpdateAll();
 				}
 			}, self.subscriptionUpdateAllRunning ? _('Updating all…') : _('Update all')));
 			return el;
@@ -1150,9 +1184,17 @@ return view.extend({
 		o.rmempty = false;
 		o.modalonly = true;
 
-		o = sub.option(form.ListValue, 'update_hour', _('Update time'));
+		o = sub.option(form.ListValue, 'update_hour', _('Update hour'));
 		for (var hour = 0; hour < 24; hour++)
-			o.value(String(hour), _('%d:00').format(hour));
+			o.value(String(hour), String(hour).padStart(2, '0'));
+		o.default = '0';
+		o.depends({ 'auto_update': '1', 'update_schedule': 'time' });
+		o.rmempty = false;
+		o.modalonly = true;
+
+		o = sub.option(form.ListValue, 'update_minute', _('Update minute'));
+		for (var minute = 0; minute < 60; minute++)
+			o.value(String(minute), String(minute).padStart(2, '0'));
 		o.default = '0';
 		o.depends({ 'auto_update': '1', 'update_schedule': 'time' });
 		o.rmempty = false;
@@ -1201,18 +1243,7 @@ return view.extend({
 		};
 		o.modalonly = true;
 		o.onclick = function(ev, section_id) {
-			// GridSection edits use a separate modal Map. Parse that Map first
-			// so a new URL is saved before the parent view starts the update.
-			return this.map.save(normalizeAll).then(function() {
-				return self.map.load();
-			}).then(function() {
-				return self.map.reset();
-			}).then(function() {
-				ui.hideModal();
-				return self.handleSubscriptionUpdate(section_id);
-			}).catch(function(err) {
-				ui.addNotification(null, E('p', {}, [ err.message || err ]), 'danger');
-			});
+			return self.handleSubscriptionUpdate(section_id, this.map);
 		};
 
 		return m.render();

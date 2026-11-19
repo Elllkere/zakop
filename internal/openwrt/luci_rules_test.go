@@ -6,12 +6,25 @@ import (
 	"testing"
 )
 
-func TestRulesLuCINoMatchAllOrLegacyMatchers(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
+func rulesLuCISource(t *testing.T) string {
+	t.Helper()
+	view, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(data)
+	fields, err := os.ReadFile("../../embedded/files/www/luci-static/resources/zakop/ruleform.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup, err := os.ReadFile("../../embedded/files/www/luci-static/resources/zakop/rulebackup.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(view) + "\n" + string(fields) + "\n" + string(backup)
+}
+
+func TestRulesLuCINoMatchAllOrLegacyMatchers(t *testing.T) {
+	s := rulesLuCISource(t)
 	for _, forbidden := range []string{
 		"match_all",
 		"domain_exact",
@@ -33,11 +46,7 @@ func TestRulesLuCINoMatchAllOrLegacyMatchers(t *testing.T) {
 }
 
 func TestRulesLuCIExplicitEnabledAndPriorityRewrite(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	for _, want := range []string{
 		"form.Flag, 'enabled'",
 		"o.enabled = '1'",
@@ -58,11 +67,7 @@ func TestRulesLuCIExplicitEnabledAndPriorityRewrite(t *testing.T) {
 }
 
 func TestRulesLuCISortsRenderedRulesByPriority(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	for _, want := range []string{
 		"function rulePriority(section_id, fallback)",
 		"function sortRuleSectionIDs(ids)",
@@ -106,11 +111,7 @@ func TestRulesLuCISortsRenderedRulesByPriority(t *testing.T) {
 }
 
 func TestRulesLuCIHiddenOutsideCustomMode(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	for _, want := range []string{
 		"if (String(uci.get('zakop', 'main', 'routing_mode') || 'custom').trim() != 'custom')",
 		"routingMode = String(uci.get('zakop', 'main', 'routing_mode') || 'custom').trim()",
@@ -123,43 +124,32 @@ func TestRulesLuCIHiddenOutsideCustomMode(t *testing.T) {
 	}
 }
 
-func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+func TestRulesLuCIImportExportPreservesAvailableAssignments(t *testing.T) {
+	s := rulesLuCISource(t)
 	for _, want := range []string{
-		"function exportRulesJSON()",
+		"function exportRulesJSON(orderedIDs)",
 		"function parseImportedRules(text)",
 		"showExportRules: function()",
 		"showImportRules: function()",
-		"handleImportRules: function(text)",
+		"function handleImportRules(text, map, rewrite)",
 		"s.renderSectionAdd = function()",
 		"function downloadTextFile(filename, text)",
 		"new Blob([ text ], { type: 'application/json' })",
 		"'download': filename",
-		"downloadTextFile('zakop-rules.json', exportRulesJSON())",
+		"downloadTextFile('zakop-rules.json', exportRulesJSON(orderedIDs))",
 		"function pickTextFile(accept)",
 		"'type': 'file'",
 		"'accept': accept",
 		"new FileReader()",
 		"reader.readAsText(file)",
 		"pickTextFile('.json,application/json')",
-		"action: 'direct'",
-		"outbound: 'direct'",
-		"dns_mode: 'auto'",
-		"function isProviderRuleOption(option)",
-		"option == 'domain_provider' || option == 'ip_provider' || option == 'provider'",
-		"if (domainInput != '' && domainInput != 'provider')",
-		"if (ipInput != '' && ipInput != 'provider')",
-		"if (isProviderRuleOption(option))",
-		"if (domainInput == 'provider')",
-		"if (ipInput == 'provider')",
-		"uci.set('zakop', section_id, 'action', 'direct')",
-		"uci.set('zakop', section_id, 'outbound', 'direct')",
-		"uci.set('zakop', section_id, 'dns_mode', 'auto')",
-		"uci.remove('zakop', sections[i])",
+		"client_rules: clients",
+		"rule.override = section.override",
+		"findOutbound(catalog.outbounds, tag",
+		"findProvider(catalog.providers, id",
+		"clean.action = 'direct'",
+		"was not found and was removed.",
+		"uci.remove('zakop', sid)",
 		"return zakopUI.commitConfig()",
 		"zakopUI.restart()",
 	} {
@@ -181,11 +171,7 @@ func TestRulesLuCIImportExportForcesDirectAction(t *testing.T) {
 }
 
 func TestRulesLuCIDNSModeHiddenAndAutomatic(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	if strings.Contains(s, "s.option(form.ListValue, 'dns_mode'") || strings.Contains(s, "DNS mode") {
 		t.Fatalf("rules.js must not expose dns_mode in LuCI:\n%s", s)
 	}
@@ -199,11 +185,7 @@ func TestRulesLuCIDNSModeHiddenAndAutomatic(t *testing.T) {
 }
 
 func TestRulesLuCICompactTableFields(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	for _, field := range []string{
 		"domain_equals",
 		"domain_contains",
@@ -278,11 +260,7 @@ func TestRulesLuCICompactTableFields(t *testing.T) {
 }
 
 func TestRulesLuCIOutboundVisibleInTable(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	start := strings.Index(s, "form.ListValue, 'outbound'")
 	end := strings.Index(s, "form.ListValue, 'domain_input'")
 	if start < 0 || end < 0 || end <= start {
@@ -321,8 +299,9 @@ func TestRulesLuCIOutboundVisibleInTable(t *testing.T) {
 	if strings.Contains(block, "proxy_default") {
 		t.Fatalf("rule outbound dropdown must not add proxy_default:\n%s", block)
 	}
-	if strings.Contains(s, "section.enabled") {
-		t.Fatalf("rules.js must not filter custom outbounds by removed enabled option:\n%s", s)
+	choices := s[strings.Index(s, "function firstOutboundTag()"):strings.Index(s, "function toArray(")]
+	if strings.Contains(choices, "section.enabled") {
+		t.Fatalf("outbound choices must not filter by the removed enabled option:\n%s", choices)
 	}
 	for _, want := range []string{
 		"firstOutbound = firstOutboundTag()",
@@ -338,11 +317,7 @@ func TestRulesLuCIOutboundVisibleInTable(t *testing.T) {
 }
 
 func TestRulesLuCIInputModesNormalizePersistence(t *testing.T) {
-	data, err := os.ReadFile("../../embedded/files/www/luci-static/resources/view/zakop/rules.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(data)
+	s := rulesLuCISource(t)
 	for _, want := range []string{
 		"uci.set('zakop', sid, 'domain_input', domainInput)",
 		"uci.set('zakop', sid, 'ip_input', ipInput)",

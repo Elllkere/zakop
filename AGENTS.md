@@ -96,6 +96,16 @@ Routing modes:
 - `global`: all LAN client TCP/UDP goes to proxy except direct clients and
   reserved/local destinations.
 
+Client rules use `config client_rule` and `option client_ip` to scope a rule
+to a configured IPv4 client. They run in order before shared rules for clients
+with the default policy in custom and simple modes. `option override` refers
+to a shared rule's stable `rule_id` (or its named UCI section), inheriting its
+matchers while using the client rule's action and outbound. Inactive or missing
+shared rules leave their overrides inactive. Scoped FakeIP lookups use a
+separate TProxy listener so a domain match cannot override an outbound already
+selected by a client IP/CIDR rule. Client rules and their references are included
+in rule backups.
+
 ## Current DNS Model
 
 - `dns_listen` is the local zakopd DNS server/listener used by dnsmasq.
@@ -319,7 +329,7 @@ FakeIP matching must ignore ports because DNS phase has no packet port.
 - Subscription nodes are ordinary editable outbounds in the main Outbounds
   table. A later update of the same subscription overwrites those nodes again.
 - `config subscription '<name>'` supports `label`, `url`,
-  `auto_update`, `update_schedule`, `update_hour`,
+  `auto_update`, `update_schedule`, `update_hour`, `update_minute`,
   `update_interval_minutes`, `update_via`, and `update_outbound`.
 - Supported import URI schemes are `vless://`, `hysteria2://`/`hy2://`,
   `ss://`, and `trojan://`.

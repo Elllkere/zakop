@@ -12,10 +12,17 @@ func TestClientsLuCIPolicyHelpIsSectionDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(data)
-	help := "Default follows general routing mode. Proxy forces non-reserved traffic through zakop. Direct bypasses zakop completely."
-
-	if !strings.Contains(s, "form.GridSection, 'client', _('Clients'),") || !strings.Contains(s, "_('"+help+"')") {
-		t.Fatalf("clients policy help should be on the Clients section like Rules help:\n%s", s)
+	if !strings.Contains(s, "form.GridSection, 'client', _('Clients'),") {
+		t.Fatal("client policy help must be a section description")
+	}
+	for _, help := range []string{
+		"Default — use the rules for this device first, then the shared settings.",
+		"proxy — use the selected proxy for internet traffic. Local traffic goes directly.",
+		"direct — use the internet directly, bypassing zakop.",
+	} {
+		if !strings.Contains(s, "_('"+help+"')") {
+			t.Fatalf("missing client policy description %q", help)
+		}
 	}
 	if strings.Contains(s, "form.ListValue, 'policy', _('Policy'),") {
 		t.Fatalf("clients policy help must not render inside the table option:\n%s", s)

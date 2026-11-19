@@ -83,6 +83,35 @@ function commandSuccess(res, message) {
 	return res;
 }
 
+function notify(content, severity) {
+	var container = document.getElementById('zakop-notifications');
+	if (!container) {
+		container = E('div', {
+			'id': 'zakop-notifications',
+			'aria-label': _('Notifications'),
+			'style': 'position:fixed;right:1rem;bottom:1rem;z-index:10000;' +
+				'width:min(30rem,calc(100vw - 2rem));max-height:65vh;overflow:auto'
+		});
+		document.body.appendChild(container);
+	}
+	var message = E('div', {
+		'class': 'alert-message ' + (severity || 'info'),
+		'role': severity == 'danger' ? 'alert' : 'status',
+		'style': 'margin:.25rem 0;overflow-wrap:anywhere'
+	}, [
+		typeof content == 'string' ? E('div', {}, content) : content,
+		E('div', { 'class': 'right' }, [
+			E('button', { 'class': 'cbi-button', 'click': function() {
+				message.remove();
+				if (!container.firstChild)
+					container.remove();
+			} }, _('Dismiss'))
+		])
+	]);
+	container.insertBefore(message, container.firstChild);
+	container.scrollTop = 0;
+}
+
 function showApplyProgress() {
 	ui.showModal(_('Save & Apply'), [
 		E('p', { 'class': 'spinning' }, [ _('Applying configuration changes…') ])
@@ -281,6 +310,7 @@ function syncRulesTab() {
 
 return baseclass.extend({
 	applyAndRestart: applyAndRestart,
+	notify: notify,
 	runJob: runJob,
 	commitConfig: commitConfig,
 	restart: restart,

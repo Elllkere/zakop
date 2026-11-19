@@ -35,7 +35,11 @@ func generate(in Input, diagnostics bool) (string, error) {
 	proxyClients := collectClients(cfg, "proxy")
 	lanSubnets := policy.NormalizeIPv4CIDRs(policy.MustIPv4CIDRs(cfg.Main.LANSubnets...))
 	reserved4 := reservedCIDRs(cfg)
+	rules := cfg.EffectiveRules()
+	setIndices := ruleengine.IPSetIndices(rules)
+	clientSources := config.ClientRuleSources(rules)
 	proxyTargets := proxyroute.Targets(cfg)
+	clientFakeIP, hasClientFakeIP := proxyroute.ClientFakeIPTarget(cfg, clientSources, proxyTargets)
 	var defaultProxyTarget proxyroute.Target
 	if len(proxyTargets) > 0 {
 		defaultProxyTarget = proxyTargets[0]
@@ -59,7 +63,10 @@ func generate(in Input, diagnostics bool) (string, error) {
 	writeSet(&b, "reserved4", policy.CIDRStrings(reserved4))
 	writeSet(&b, "direct_clients4", directClients)
 	writeSet(&b, "proxy_clients4", proxyClients)
-	writeRuleSets(&b, cfg, in.RuleCIDRs)
+	if hasClientFakeIP {
+		writeSet(&b, "client_rules4", clientSources)
+	}
+	writeRuleSets(&b, rules, setIndices, in.RuleCIDRs)
 	if cfg.Main.ManageDNSMasq {
 		b.WriteString("\tchain dns_prerouting {\n")
 		b.WriteString("\t\ttype nat hook prerouting priority dstnat; policy accept;\n")
@@ -97,10 +104,13 @@ func generate(in Input, diagnostics bool) (string, error) {
 			b.WriteString(fmt.Sprintf("\t\tmeta l4proto { tcp, udp }%s jump %s\n", counter(cfg), defaultProxyTarget.Chain))
 		}
 	default:
-		if cfg.Main.FakeIPEnabled && defaultProxyTarget.Tag != "" && hasProxyDomainRule(cfg) {
+		if hasClientFakeIP {
+			b.WriteString(fmt.Sprintf("\t\tip saddr @client_rules4 ip daddr %s meta l4proto { tcp, udp }%s goto %s\n", cfg.Main.FakeIPRange, counter(cfg), clientFakeIP.Chain))
+		}
+		if cfg.Main.FakeIPEnabled && defaultProxyTarget.Tag != "" && hasProxyDomainRule(rules) {
 			b.WriteString(fmt.Sprintf("\t\tip daddr %s meta l4proto { tcp, udp }%s jump %s\n", cfg.Main.FakeIPRange, counter(cfg), defaultProxyTarget.Chain))
 		}
-		if err := writeOrderedIPRules(&b, cfg, in.RuleCIDRs, proxyTargets); err != nil {
+		if err := writeOrderedIPRules(&b, cfg, rules, setIndices, in.RuleCIDRs, proxyTargets); err != nil {
 			return "", err
 		}
 	}
@@ -109,6 +119,9 @@ func generate(in Input, diagnostics bool) (string, error) {
 	}
 	b.WriteString("\t\treturn\n")
 	b.WriteString("\t}\n")
+	if hasClientFakeIP {
+		proxyTargets = append(proxyTargets, clientFakeIP)
+	}
 	for _, target := range proxyTargets {
 		b.WriteString(fmt.Sprintf("\tchain %s {\n", target.Chain))
 		if buildmode.NetworkDebug && diagnostics {
@@ -117,7 +130,10 @@ func generate(in Input, diagnostics bool) (string, error) {
 		}
 		success := ""
 		if buildmode.NetworkDebug && diagnostics {
-			success = " counter name debug_tproxy_success counter name debug_success_" + target.Chain
+			success = " counter name debug_tproxy_success"
+			if target.Tag != "" {
+				success += " counter name debug_success_" + target.Chain
+			}
 		}
 		b.WriteString(fmt.Sprintf("\t\tmeta l4proto { tcp, udp }%s meta mark set %s tproxy ip to 127.0.0.1:%d%s accept\n", counter(cfg), cfg.Main.Mark, target.Port, success))
 		if buildmode.NetworkDebug && diagnostics {
@@ -131,24 +147,24 @@ func generate(in Input, diagnostics bool) (string, error) {
 	return b.String(), nil
 }
 
-func writeRuleSets(b *strings.Builder, cfg config.Config, ruleCIDRs map[int][]*net.IPNet) {
-	for i, rule := range cfg.EffectiveRules() {
-		if !ruleengine.HasIPMatch(rule) || len(ruleCIDRs[i]) == 0 {
+func writeRuleSets(b *strings.Builder, rules []config.Rule, setIndices []int, ruleCIDRs map[int][]*net.IPNet) {
+	for i, rule := range rules {
+		if setIndices[i] != i || !ruleengine.HasIPMatch(rule) || len(ruleCIDRs[i]) == 0 {
 			continue
 		}
 		writeSet(b, ruleSetName(i), policy.CIDRStrings(policy.NormalizeIPv4CIDRs(ruleCIDRs[i])))
 	}
 }
 
-func writeOrderedIPRules(b *strings.Builder, cfg config.Config, ruleCIDRs map[int][]*net.IPNet, proxyTargets []proxyroute.Target) error {
-	for i, rule := range cfg.EffectiveRules() {
+func writeOrderedIPRules(b *strings.Builder, cfg config.Config, rules []config.Rule, setIndices []int, ruleCIDRs map[int][]*net.IPNet, proxyTargets []proxyroute.Target) error {
+	for i, rule := range rules {
 		if !ruleengine.HasIPMatch(rule) {
 			continue
 		}
-		if len(ruleCIDRs[i]) == 0 {
+		if len(ruleCIDRs[setIndices[i]]) == 0 {
 			continue
 		}
-		matches, err := rulePacketMatches(ruleSetName(i), rule)
+		matches, err := rulePacketMatches(ruleSetName(setIndices[i]), rule)
 		if err != nil {
 			return fmt.Errorf("rule %q packet match: %w", rule.Name, err)
 		}
@@ -174,9 +190,9 @@ func writeOrderedIPRules(b *strings.Builder, cfg config.Config, ruleCIDRs map[in
 	return nil
 }
 
-func hasProxyDomainRule(cfg config.Config) bool {
-	for _, rule := range cfg.EffectiveRules() {
-		if rule.Enabled && rule.Action == "proxy" && ruleengine.HasDomainIncludes(rule) {
+func hasProxyDomainRule(rules []config.Rule) bool {
+	for _, rule := range rules {
+		if rule.ClientIP == "" && rule.Enabled && rule.Action == "proxy" && ruleengine.HasDomainIncludes(rule) {
 			return true
 		}
 	}
@@ -185,6 +201,9 @@ func hasProxyDomainRule(cfg config.Config) bool {
 
 func rulePacketMatches(setName string, rule config.Rule) ([]string, error) {
 	base := "ip daddr @" + setName
+	if rule.ClientIP != "" {
+		base = "ip saddr " + rule.ClientIP + " " + base
+	}
 	protos := packetProtocols(rule)
 	srcPorts, err := parseNFTPorts(rule.SrcPorts)
 	if err != nil {

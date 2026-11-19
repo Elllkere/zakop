@@ -144,7 +144,7 @@ func TestEveryProxyOutboundSelectorIncludesPools(t *testing.T) {
 	paths := []string{
 		"../../embedded/files/www/luci-static/resources/view/zakop/general.js",
 		"../../embedded/files/www/luci-static/resources/view/zakop/clients.js",
-		"../../embedded/files/www/luci-static/resources/view/zakop/rules.js",
+		"../../embedded/files/www/luci-static/resources/zakop/ruleform.js",
 		"../../embedded/files/www/luci-static/resources/view/zakop/providers.js",
 		"../../embedded/files/www/luci-static/resources/view/zakop/outbounds.js",
 	}

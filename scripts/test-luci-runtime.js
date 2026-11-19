@@ -58,24 +58,210 @@ async function subscriptions() {
 		async reset() { calls.push('parent.reset'); }
 	}
 	const source = fs.readFileSync('embedded/files/www/luci-static/resources/view/zakop/outbounds.js', 'utf8');
-	const page = new Function('view', 'fs', 'form', 'ui', 'uci', 'zakopI18n', 'zakopUI', 'outboundCards', 'L', 'E', source)(
+	let completeUpdate;
+	const notifications = [];
+	const buttons = [ 'new_sub', 'other_sub' ].map(name => ({
+		getAttribute: () => name, classList: { toggle() {} }, disabled: false
+	}));
+	const doc = { querySelectorAll: () => buttons, querySelector: () => null };
+	const helper = {
+		syncRulesTab() {},
+		runJob: async (name, args) => {
+			calls.push(name + ':' + args[0]);
+			return new Promise(resolve => { completeUpdate = resolve; });
+		},
+		restart: async () => calls.push('restart'),
+		notify: (message, severity) => notifications.push([message, severity])
+	};
+	const page = new Function('view', 'fs', 'form', 'ui', 'uci', 'zakopI18n', 'zakopUI', 'outboundCards', 'L', 'E', 'document', source)(
 		{ extend: obj => obj }, {}, { Map, GridSection: function() {} },
-		{ hideModal: () => calls.push('hide'), addNotification: () => calls.push('error') },
-		{ get() {}, sections() {} }, { translate: text => text }, { syncRulesTab() {} }, {},
-		{ bind: (fn, self) => fn.bind(self), toArray: value => value || [] }, () => ({}));
+		{ hideModal: () => calls.push('hide') },
+		{ get() {}, sections() {}, unload: () => calls.push('unload') }, { translate: text => text }, helper, {},
+		{ bind: (fn, self) => fn.bind(self), toArray: value => value || [] }, () => ({}), doc);
 	page.render();
 	const sub = sections.find(section => section.name === 'subscription');
 	assert.equal(sub.options.some(option => option.option === 'enabled'), false);
 	assert.notEqual(sub.options.find(option => option.option === 'url').editable, true);
 	assert.equal(sub.options.find(option => option.option === 'auto_update').editable, true);
+	assert.equal(sub.options.find(option => option.option === 'update_minute').default, '0');
 	const update = sub.options.find(option => option.option === '_update');
-	page.handleSubscriptionUpdate = async name => calls.push('update:' + name);
+	page.handleSaveCommitConfig = async () => calls.push('commit');
 	const modalMap = { save: async () => calls.push('modal.save') };
-	await update.onclick.call({ map: modalMap }, {}, 'new_sub');
-	assert.deepEqual(calls, ['modal.save', 'parent.load', 'parent.reset', 'hide', 'update:new_sub']);
+	const pending = update.onclick.call({ map: modalMap }, {}, 'new_sub');
+	assert.equal(buttons[0].textContent, 'Updating…');
+	assert.ok(buttons.every(button => button.disabled));
+	await page.handleSubscriptionUpdate('other_sub');
+	await new Promise(resolve => setImmediate(resolve));
+	assert.deepEqual(calls, ['modal.save', 'parent.load', 'parent.reset', 'hide', 'commit', 'subscriptions:new_sub']);
+	completeUpdate({ code: 0 });
+	await pending;
+	assert.deepEqual(calls.slice(-4), ['restart', 'unload', 'parent.load', 'parent.reset']);
+	assert.deepEqual(notifications, [['Subscription "new_sub" updated.', 'success']]);
+	assert.ok(buttons.every(button => !button.disabled));
 	calls.length = 0;
 	await update.onclick.call({ map: { save: async () => { throw Error('invalid URL'); } } }, {}, 'new_sub');
-	assert.deepEqual(calls, ['error']);
+	assert.deepEqual(calls, []);
+	assert.deepEqual(notifications.at(-1), ['invalid URL', 'danger']);
+	assert.ok(buttons.every(button => !button.disabled));
+}
+
+async function clientForms() {
+	const root = 'embedded/files/www/luci-static/resources/';
+	const source = fs.readFileSync(root + 'view/zakop/clients.js', 'utf8');
+	const fields = fs.readFileSync(root + 'zakop/ruleform.js', 'utf8');
+	const shared = { '.name': 'rule0', name: 'YouTube', rule_id: 'youtube' };
+	const rules = {
+		override: { override: 'youtube', name: 'Old override label' },
+		custom: { name: 'Laptop only' }
+	};
+	const sections = {};
+	const api = {
+		get: (_conf, sid, key) => rules[sid]?.[key],
+		sections: (_conf, type, cb) => {
+			const rows = type === 'rule' ? [shared] : [];
+			if (cb) rows.forEach(row => cb(row, row['.name']));
+			return rows;
+		}
+	};
+	const tag = (name, attrs, children) => ({ name, attrs, children });
+	function GridSection(sectiontype) {
+		this.sectiontype = sectiontype;
+		this.children = [];
+	}
+	GridSection.prototype.option = function(type, option, title, description) {
+		const field = { type, option, title, description, value() {},
+			depends(...args) { this.dependency = args; } };
+		this.children.push(field);
+		return field;
+	};
+	GridSection.prototype.load = async function() {};
+	function Value() {}
+	const attributes = {};
+	Value.prototype.renderWidget = () => ({
+		matches: selector => selector === 'input',
+		setAttribute: (key, value) => { attributes[key] = value; }
+	});
+	const form = { GridSection, Value, ListValue: function() {}, Flag: function() {},
+		Map: class {
+			section(Type, name) { return sections[name] = new Type(name); }
+			render() {}
+		}
+	};
+	const translation = { translate: text => text };
+	const hints = {
+		'02:00:00:00:00:01': { ipv4: ['192.168.8.20'] },
+		'02:00:00:00:00:02': { ipaddrs: ['192.168.8.20', '192.168.8.21', 'fd00::2'], name: 'Laptop' },
+		'02:00:00:00:00:03': { ipv6: ['fd00::3'] }
+	};
+	let available = true;
+	const rpc = { declare: spec => {
+		assert.equal(spec.method, 'getHostHints');
+		return async () => {
+			if (!available) throw Error('RPC unavailable');
+			return hints;
+		};
+	} };
+	const validation = { parseIPv4: ip => /^([0-9]+\.){3}[0-9]+$/.test(ip) ? ip.split('.').map(Number) : null };
+	const L = { toArray: value => value == null ? [] : Array.isArray(value) ? value : [value] };
+	const ruleForm = new Function('baseclass', 'form', 'uci', 'zakopI18n', fields)({ extend: obj => obj }, form, api, translation);
+	const page = new Function('rpc', 'form', 'uci', 'view', 'validation', 'zakopI18n', 'zakopUI', 'ruleForm', 'L', 'E', source)(
+		rpc, form, api, { extend: obj => obj }, validation, translation, { syncRulesTab() {} }, ruleForm, L, tag);
+	page.render();
+	const grid = sections.client_rule;
+	await grid.load();
+	const columns = grid.children.filter(option => !option.modalonly);
+	assert.deepEqual(columns.slice(0, 2).map(option => option.title), ['Enabled', 'Name']);
+	assert.equal(columns.some(option => option.option === 'override'), false);
+	assert.equal(columns[1].cfgvalue('override'), 'YouTube');
+	assert.equal(columns[1].cfgvalue('custom'), 'Laptop only');
+	assert.equal(columns[1].modalonly, false);
+	assert.deepEqual(grid.children.find(option => option.option === 'name').dependency, ['override', '-']);
+	shared.name = 'YouTube renamed';
+	await grid.load();
+	assert.equal(columns[1].cfgvalue('override'), 'YouTube renamed');
+
+	const ip = { option: 'ip', cbid: () => 'ip-field' };
+	await sections.client.addModalOptions({ children: [ip] });
+	const suggestions = ip.renderWidget('client').children[1];
+	assert.equal(attributes.list, 'ip-field-devices');
+	assert.deepEqual(suggestions.children.map(option => option.attrs), [
+		{ value: '192.168.8.20', label: 'Laptop · 02:00:00:00:00:02' },
+		{ value: '192.168.8.21', label: 'Laptop · 02:00:00:00:00:02' }
+	]);
+	available = false;
+	const manual = { option: 'ip' };
+	await sections.client.addModalOptions({ children: [manual] });
+	assert.equal(manual.renderWidget, undefined);
+}
+
+function ruleBackups() {
+	const root = 'embedded/files/www/luci-static/resources/';
+	const fields = fs.readFileSync(root + 'zakop/ruleform.js', 'utf8');
+	const source = fs.readFileSync(root + 'zakop/rulebackup.js', 'utf8');
+	const translation = { translate: text => text };
+	let next = 0;
+	let sections = [
+		{ '.name': 'client', '.type': 'client', ip: '192.168.8.20' },
+		{ '.name': 'old_node', '.type': 'outbound', type: 'vless', server: 'node.example', port: '443', uuid: 'secret', label: 'Poland' },
+		{ '.name': 'old_provider', '.type': 'provider', type: 'ip', label: 'Networks', url: 'https://example.com?token=secret' },
+		{ '.name': 'rule0', '.type': 'rule', rule_id: 'youtube', name: 'YouTube', action: 'proxy', outbound: 'old_node', domain_equals: ['youtube.com'] },
+		{ '.name': 'rule1', '.type': 'client_rule', client_ip: '192.168.8.20', override: 'youtube', name: 'Laptop YouTube', action: 'block' },
+		{ '.name': 'rule2', '.type': 'client_rule', client_ip: '192.168.8.20', name: 'Laptop IP rule', action: 'proxy', outbound: 'old_node',
+			ip_input: 'provider', ip_provider: ['old_provider'], proto: ['tcp'], dst_port: ['443'] }
+	];
+	const api = {
+		sections: (conf, type, cb) => sections.filter(section => section['.type'] === type).map(section => {
+			if (cb) cb(section, section['.name']);
+			return section;
+		}),
+		get: (conf, sid, key) => {
+			const section = sections.find(section => section['.name'] === sid);
+			return key ? section?.[key] : section;
+		},
+		add: (conf, type) => {
+			const sid = 'added' + (++next);
+			sections.push({ '.name': sid, '.type': type });
+			return sid;
+		},
+		set: (conf, sid, key, value) => { api.get(conf, sid)[key] = value; },
+		remove: (conf, sid) => { sections = sections.filter(section => section['.name'] !== sid); }
+	};
+	const ruleForm = new Function('baseclass', 'form', 'uci', 'zakopI18n', fields)({ extend: obj => obj }, {}, api, translation);
+	const transfer = new Function('uci', 'zakopI18n', 'ruleForm', source.slice(0, source.indexOf('return baseclass.extend')) +
+		'return { exportRulesJSON, parseImportedRules, replaceRules };')(api, translation, ruleForm);
+	const text = transfer.exportRulesJSON();
+	assert.doesNotMatch(text, /secret/);
+	const exported = JSON.parse(text);
+	assert.equal(exported.rules[0].outbound, 'old_node');
+	assert.equal(exported.client_rules[0].override, 'youtube');
+	assert.equal(exported.client_rules[0].name, 'YouTube');
+	api.get('zakop', 'old_node')['.name'] = 'new_node';
+	api.get('zakop', 'old_provider')['.name'] = 'new_provider';
+
+	const remapped = transfer.parseImportedRules(text);
+	assert.equal(remapped.rules[0].outbound, 'new_node');
+	assert.equal(remapped.clientRules[0].action, 'block');
+	assert.deepEqual(remapped.clientRules[1].ip_provider, ['new_provider']);
+	assert.deepEqual(remapped.warnings, []);
+	transfer.replaceRules(remapped);
+	assert.equal(api.sections('zakop', 'rule')[0].rule_id, 'youtube');
+	assert.equal(api.sections('zakop', 'client_rule')[0].override, 'youtube');
+	assert.equal(api.sections('zakop', 'client_rule')[0].name, undefined);
+	assert.notEqual(api.sections('zakop', 'client_rule')[1].outbound, 'old_node');
+
+	api.remove('zakop', 'new_node');
+	api.remove('zakop', 'new_provider');
+	const missing = transfer.parseImportedRules(text);
+	assert.equal(missing.rules[0].action, 'direct');
+	assert.equal(missing.rules[0].outbound, 'direct');
+	assert.equal(missing.clientRules[1].dst_port, undefined);
+	assert.equal(missing.clientRules[1].proto, undefined);
+	assert.match(missing.warnings.join('\n'), /old_node.*not found/);
+	assert.match(missing.warnings.join('\n'), /old_provider.*not found/);
+
+	transfer.replaceRules(transfer.parseImportedRules(JSON.stringify({ version: 1, rules: [{ name: 'YouTube' }] })));
+	assert.equal(api.sections('zakop', 'client_rule').length, 2);
+	assert.equal(api.sections('zakop', 'rule')[0].rule_id, 'youtube');
 }
 
 (async () => {
@@ -126,5 +312,7 @@ async function subscriptions() {
 	await changed.helper.commitConfig();
 	assert.equal(changed.calls.filter(call => call[0] === 'commit').length, 1);
 	await subscriptions();
+	await clientForms();
+	ruleBackups();
 	console.log('LuCI runtime checks passed');
 })().catch(err => { console.error(err); process.exitCode = 1; });

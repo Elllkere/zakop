@@ -3,6 +3,7 @@
     "description": "Grant access to zakop",
     "read": {
       "uci": [ "zakop" ],
+      "ubus": { "luci-rpc": [ "getHostHints" ] },
       "file": {
         "/bin/pidof": [ "exec" ],
         "/etc/init.d/zakop": [ "exec" ],

@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -496,4 +498,110 @@ cat "$ZAKOP_CURL_RESPONSE" > "$out"
 	t.Setenv("ZAKOP_CURL_RESPONSE", responsePath)
 	t.Setenv("ZAKOP_CURL_ARGS", argsPath)
 	return argsPath
+}
+
+func TestCompileClientRulesUseSourceScopedRoutes(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "zakop")
+	if err := os.WriteFile(cfgPath, []byte(`
+config client 'laptop'
+	option ip '192.168.8.12'
+config client 'phone'
+	option ip '192.168.8.13'
+config outbound 'poland'
+	option type 'trojan'
+	option server 'pl.example.com'
+	option port '443'
+	option password 'test'
+config outbound 'other'
+	option type 'trojan'
+	option server 'other.example.com'
+	option port '443'
+	option password 'test'
+config rule 'youtube'
+	option name 'YouTube'
+	option action 'proxy'
+	option outbound 'poland'
+	list domain_ends_with '.youtube.com'
+	list exclude_domain_equals 'private.youtube.com'
+	list ip_cidr '8.8.8.0/24'
+	list dst_port '443'
+config client_rule 'only_laptop'
+	option name 'Old override label'
+	option client_ip '192.168.8.12'
+	option override 'youtube'
+	option action 'proxy'
+	option outbound 'other'
+config client_rule 'only_phone'
+	option client_ip '192.168.8.13'
+	option action 'block'
+	list domain_equals 'youtube.com'
+	list ip_cidr '8.8.8.8'
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, nftPath, sbPath, err := compile(options{configPath: cfgPath, outDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rules := cfg.EffectiveRules(); rules[0].Name != "YouTube" {
+		t.Fatalf("override must use the shared rule name, got %q", rules[0].Name)
+	}
+	nft, err := os.ReadFile(nftPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ReplaceAll(string(nft), " counter ", " ")
+	var last int
+	for _, want := range []string{
+		"ct status dnat return",
+		"ip saddr @direct_clients4 return",
+		"ip saddr @client_rules4 ip daddr " + cfg.Main.FakeIPRange + " meta l4proto { tcp, udp } goto to_client_fakeip",
+		"ip saddr 192.168.8.12 ip daddr @rule4_0000 tcp dport 443 jump to_proxy_0001",
+		"ip saddr 192.168.8.13 ip daddr @rule4_0001 meta l4proto { tcp, udp } drop",
+		"\n\t\tip daddr @rule4_0000 tcp dport 443 jump to_proxy_0000",
+	} {
+		i := strings.Index(text, want)
+		if i <= last {
+			t.Fatalf("missing or out of order %q in ruleset:\n%s", want, text)
+		}
+		last = i
+	}
+	if strings.Contains(text, "set rule4_0002") {
+		t.Fatal("override must reuse the shared rule's CIDR set")
+	}
+	sb, err := os.ReadFile(sbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var generated struct {
+		Route struct {
+			Rules []struct {
+				Inbound  []string `json:"inbound"`
+				Sources  []string `json:"source_ip_cidr"`
+				Action   string   `json:"action"`
+				Outbound string   `json:"outbound"`
+				Rules    []struct {
+					Inbound []string `json:"inbound"`
+					Sources []string `json:"source_ip_cidr"`
+					Invert  bool     `json:"invert"`
+				}
+			}
+		}
+	}
+	if err := json.Unmarshal(sb, &generated); err != nil {
+		t.Fatal(err)
+	}
+	rules := generated.Route.Rules
+	if len(rules) < 10 || rules[0].Outbound != "other" || len(rules[0].Rules) != 2 ||
+		!slices.Equal(rules[0].Rules[0].Sources, []string{"192.168.8.12/32"}) ||
+		!slices.Equal(rules[0].Rules[0].Inbound, []string{"client-fakeip-in"}) ||
+		!rules[0].Rules[1].Invert || rules[1].Action != "reject" ||
+		!slices.Equal(rules[1].Sources, []string{"192.168.8.13/32"}) ||
+		rules[2].Outbound != "poland" || rules[3].Action != "reject" ||
+		!slices.Equal(rules[4].Inbound, []string{"tproxy-0000-in"}) ||
+		!slices.Equal(rules[4].Sources, []string{"192.168.8.12/32", "192.168.8.13/32"}) ||
+		rules[4].Outbound != "poland" || rules[6].Action != "sniff" {
+		t.Fatalf("unexpected scoped FakeIP and packet routes: %s", sb)
+	}
 }

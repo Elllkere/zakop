@@ -34,8 +34,12 @@ func MatchDomain(r config.Rule, name string) bool {
 }
 
 func DomainDecision(rules []config.Rule, name string) Decision {
+	return ClientDomainDecision(rules, name, "")
+}
+
+func ClientDomainDecision(rules []config.Rule, name, clientIP string) Decision {
 	for i := range rules {
-		if !MatchDomain(rules[i], name) {
+		if (rules[i].ClientIP != "" && rules[i].ClientIP != clientIP) || !MatchDomain(rules[i], name) {
 			continue
 		}
 		r := &rules[i]
@@ -51,6 +55,31 @@ func DomainDecision(rules []config.Rule, name string) Decision {
 
 func HasIPMatch(r config.Rule) bool {
 	return r.Enabled && len(r.IPCIDRs)+len(r.Files)+len(r.IPProviders)+len(r.Providers) > 0
+}
+
+// IPSetIndices lets overrides and their shared rule use the same CIDR set.
+func IPSetIndices(rules []config.Rule) []int {
+	indices := make([]int, len(rules))
+	shared := make(map[string]int)
+	for i, rule := range rules {
+		indices[i] = i
+		if !HasIPMatch(rule) {
+			continue
+		}
+		id := rule.Override
+		if rule.ClientIP == "" {
+			id = rule.ID
+		}
+		if id == "" {
+			continue
+		}
+		if first, ok := shared[id]; ok {
+			indices[i] = first
+		} else {
+			shared[id] = i
+		}
+	}
+	return indices
 }
 
 func HasDomainIncludes(r config.Rule) bool {
